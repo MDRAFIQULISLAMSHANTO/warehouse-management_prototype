@@ -86,12 +86,15 @@ function CellInstances({
   boxes,
   selectedId,
   dimmed,
+  ghost,
   onPick,
   onHover,
 }: {
   boxes: CellBox[];
   selectedId?: string;
   dimmed?: Set<string>;
+  /** Positions filtered out: drawn as faint shells, and not pickable. */
+  ghost?: boolean;
   onPick: (cellId: string) => void;
   onHover: (cellId: string | null, clientX: number, clientY: number) => void;
 }) {
@@ -136,9 +139,13 @@ function CellInstances({
     if (!instanced) return;
     boxes.forEach((box, i) => {
       TEMP_COLOR.set(VISUAL_COLOR[box.visual]);
-      // A selection washes everything else out, so the picked volume reads
-      // even when it sits deep inside the racking.
-      if (selectedId && box.cellId !== selectedId) {
+      if (ghost) {
+        // Filtered-out positions keep the racking readable without competing
+        // with the positions the user asked to see.
+        TEMP_COLOR.lerp(WASH, 0.9);
+      } else if (selectedId && box.cellId !== selectedId) {
+        // A selection washes everything else out, so the picked volume reads
+        // even when it sits deep inside the racking.
         TEMP_COLOR.lerp(WASH, 0.82);
       } else if (dimmed && !dimmed.has(box.cellId)) {
         TEMP_COLOR.lerp(WASH, 0.78);
@@ -146,7 +153,7 @@ function CellInstances({
       instanced.setColorAt(i, TEMP_COLOR);
     });
     if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
-  }, [boxes, selectedId, dimmed]);
+  }, [boxes, selectedId, dimmed, ghost]);
 
   const handleMove = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
@@ -172,18 +179,21 @@ function CellInstances({
 
   return (
     <instancedMesh
-      key={boxes.length}
+      key={`${ghost ? "ghost" : "live"}-${boxes.length}`}
       ref={mesh}
       args={[CELL_GEOMETRY, undefined, Math.max(1, boxes.length)]}
-      onPointerMove={handleMove}
-      onPointerOut={() => onHover(null, 0, 0)}
-      onClick={handleClick}
+      // Ghosts are scenery: pointer events must fall through to the positions
+      // the filter kept, even where a ghost sits in front of one.
+      raycast={ghost ? () => null : undefined}
+      onPointerMove={ghost ? undefined : handleMove}
+      onPointerOut={ghost ? undefined : () => onHover(null, 0, 0)}
+      onClick={ghost ? undefined : handleClick}
     >
       {/* Translucent, like Odoo's view, so racking behind stays readable. */}
       <meshLambertMaterial
         vertexColors
         transparent
-        opacity={0.62}
+        opacity={ghost ? 0.14 : 0.62}
         depthWrite={false}
       />
     </instancedMesh>
@@ -485,6 +495,10 @@ export interface Warehouse3DProps {
   highlightCellIds?: Set<string>;
   height?: number;
   showLabels?: boolean;
+  /** Occupancy categories to show. Undefined or empty means show everything. */
+  visibleVisuals?: Set<CellVisual>;
+  onToggleVisual?: (visual: CellVisual) => void;
+  onResetVisuals?: () => void;
 }
 
 export function Warehouse3D({
@@ -497,6 +511,9 @@ export function Warehouse3D({
   highlightCellIds,
   height = 520,
   showLabels = true,
+  visibleVisuals,
+  onToggleVisual,
+  onResetVisuals,
 }: Warehouse3DProps) {
   const [hover, setHover] = useState<{ cellId: string; x: number; y: number } | null>(
     null,
@@ -505,6 +522,24 @@ export function Warehouse3D({
 
   const boxes = useMemo(() => buildCellBoxes(cells, rackById), [cells, rackById]);
   const bounds = useMemo(() => boundsOf(boxes), [boxes]);
+
+  // A filter of "everything" is the same as no filter, and treating it as one
+  // keeps the fast path (a single instanced mesh) for the common case.
+  const filtering =
+    !!visibleVisuals &&
+    visibleVisuals.size > 0 &&
+    visibleVisuals.size < VISUAL_LEGEND.length;
+
+  const liveBoxes = useMemo(
+    () =>
+      filtering ? boxes.filter((b) => visibleVisuals!.has(b.visual)) : boxes,
+    [boxes, filtering, visibleVisuals],
+  );
+  const ghostBoxes = useMemo(
+    () =>
+      filtering ? boxes.filter((b) => !visibleVisuals!.has(b.visual)) : [],
+    [boxes, filtering, visibleVisuals],
+  );
 
   const cellById = useMemo(() => {
     const map = new Map<string, CellRow>();
@@ -558,15 +593,23 @@ export function Warehouse3D({
 
             <Floor bounds={bounds} />
             <CellEdges boxes={boxes} />
+            {ghostBoxes.length > 0 && (
+              <CellInstances
+                boxes={ghostBoxes}
+                ghost
+                onPick={() => undefined}
+                onHover={() => undefined}
+              />
+            )}
             <CellInstances
-              boxes={boxes}
+              boxes={liveBoxes}
               selectedId={selectedCellId}
               dimmed={highlightCellIds}
               onPick={(cellId) => onSelectCell?.(cellId)}
               onHover={(cellId, x, y) => setHover(cellId ? { cellId, x, y } : null)}
             />
             <PositionLabels
-              boxes={boxes}
+              boxes={liveBoxes}
               cellById={cellById}
               selectedId={selectedCellId}
             />
@@ -597,29 +640,69 @@ export function Warehouse3D({
         </span>
       </div>
 
-      {/* Odoo draws the legend inside the scene, top right. */}
+      {/* Odoo draws the legend inside the scene, top right. Here it is also the
+          filter: each row toggles that occupancy category. Filtered-out
+          positions stay on screen as faint shells so the racking still reads
+          and the hidden volume is honest rather than silently absent. */}
       <div
-        className="absolute right-2 top-2 px-2.5 py-2 rounded-[var(--o-radius)] text-[var(--o-fs-xs)] flex flex-col gap-0.5"
-        style={{ background: "rgba(255,255,255,0.9)", minWidth: 190 }}
+        className="absolute right-2 top-2 px-2 py-2 rounded-[var(--o-radius)] text-[var(--o-fs-xs)] flex flex-col gap-0.5"
+        style={{ background: "rgba(255,255,255,0.92)", minWidth: 214 }}
       >
-        {VISUAL_LEGEND.map((entry) => (
-          <div key={entry.id} className="flex items-center gap-2" title={entry.hint}>
-            <span
+        <div className="flex items-baseline gap-2 px-1 pb-1">
+          <span className="font-medium text-[var(--o-gray-700)]">Show</span>
+          {filtering && onResetVisuals && (
+            <button
+              type="button"
+              className="o-btn o-btn-link o-btn-sm ml-auto"
+              onClick={onResetVisuals}
+            >
+              Show all
+            </button>
+          )}
+        </div>
+        {VISUAL_LEGEND.map((entry) => {
+          const on = !filtering || visibleVisuals!.has(entry.id);
+          const count = counts.get(entry.id) ?? 0;
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              className="flex items-center gap-2 px-1 py-0.5 rounded-[var(--o-radius-sm)] text-left"
               style={{
-                width: 13,
-                height: 13,
-                borderRadius: 2,
-                background: entry.color,
-                display: "inline-block",
-                flex: "0 0 auto",
+                background: on ? "transparent" : "var(--o-gray-100)",
+                opacity: on ? 1 : 0.5,
+                cursor: onToggleVisual ? "pointer" : "default",
               }}
-            />
-            <span className="font-medium">{entry.label}</span>
-            <span className="ml-auto o-tabular text-[var(--o-text-subtle)]">
-              {formatInt(counts.get(entry.id) ?? 0)}
-            </span>
+              aria-pressed={on}
+              title={`${entry.hint}${
+                onToggleVisual ? " Select to show or hide this category." : ""
+              }`}
+              onClick={() => onToggleVisual?.(entry.id)}
+            >
+              <span
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: 2,
+                  background: on ? entry.color : "transparent",
+                  border: `1.5px solid ${entry.color}`,
+                  display: "inline-block",
+                  flex: "0 0 auto",
+                }}
+              />
+              <span className="font-medium">{entry.label}</span>
+              <span className="ml-auto o-tabular text-[var(--o-text-subtle)]">
+                {formatInt(count)}
+              </span>
+            </button>
+          );
+        })}
+        {filtering && (
+          <div className="px-1 pt-1 text-[var(--o-fs-xxs)] text-[var(--o-text-subtle)] border-t border-[var(--o-border-subtle)] mt-1">
+            Showing {formatInt(liveBoxes.length)} of {formatInt(boxes.length)}{" "}
+            positions
           </div>
-        ))}
+        )}
       </div>
 
       {hover && hoveredCell && !selectedCell && (
@@ -651,7 +734,10 @@ export function Warehouse3D({
       )}
 
       <p className="mt-2 text-[var(--o-fs-xs)] text-[var(--o-text-muted)]">
-        {formatInt(boxes.length)} installed positions drawn. Schematic layout:
+        {filtering
+          ? `${formatInt(liveBoxes.length)} of ${formatInt(boxes.length)} installed positions shown; the rest are drawn as faint shells.`
+          : `${formatInt(boxes.length)} installed positions drawn.`}{" "}
+        Schematic layout:
         bay counts, level counts and position totals come from{" "}
         {warehouse.drawingRef}; plan coordinates are approximate and level
         heights are uniform rather than the drawn beam heights.

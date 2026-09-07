@@ -170,6 +170,15 @@ an operation is validated the affected positions repaint immediately - picking
 200 kg off a full pallet moves one box from red to green, and the legend counts
 move with it.
 
+The in-scene legend is also the **filter**: each row toggles that occupancy
+category, so the view can be narrowed to just the full positions, just the ones
+with room, just the blocked ones, or any combination. Filtered-out positions are
+not deleted from the scene - they stay as faint shells, so the racking still
+reads and the hidden volume is visible rather than silently absent, and the panel
+states how many of the total are being shown. The selection lives in the URL
+(`?view=3d&vis=free_space`), so a filtered view can be linked to and survives a
+refresh.
+
 Clicking a position glides the camera in on it, washes every other volume out to
 pale grey, and opens a card with the location reference, **Total Capacity**,
 **Available Space** and the products held - the same information Odoo's own view

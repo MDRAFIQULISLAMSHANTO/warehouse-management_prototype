@@ -33,6 +33,7 @@ import { useUrlParam, useUrlParams } from "@/hooks/useSearchState";
 import { CellPreview } from "@/map/CellPreview";
 import { FloorPlan, occupancyColor } from "@/map/FloorPlan";
 import { ElevationLegend, RackElevation } from "@/map/RackElevation";
+import { VISUAL_LEGEND, type CellVisual } from "@/map/warehouse3dGeometry";
 import { useDerived } from "@/store/appStore";
 
 /** three.js is ~400 kB; it must not sit in the main presentation bundle. */
@@ -90,8 +91,30 @@ function OccupancyBody({
   const [rackId, setRackId] = useUrlParam("rack");
   const [cellId, setCellId] = useUrlParam("cell");
   const [view, setView] = useUrlParam("view");
+  const [visParam, setVisParam] = useUrlParam("vis");
   const is3D = view === "3d";
   const rackById = useDerived().index.rackById;
+
+  /** Occupancy categories shown in the 3D view; empty means show everything. */
+  const visibleVisuals = useMemo(() => {
+    if (!visParam) return undefined;
+    const wanted = new Set(visParam.split(",").filter(Boolean) as CellVisual[]);
+    return wanted.size ? wanted : undefined;
+  }, [visParam]);
+
+  const toggleVisual = (visual: CellVisual) => {
+    const all = VISUAL_LEGEND.map((entry) => entry.id);
+    const current = new Set<CellVisual>(visibleVisuals ?? all);
+    if (current.has(visual)) current.delete(visual);
+    else current.add(visual);
+    // Hiding the last category would leave an empty scene with no way back, so
+    // an empty selection is treated as "show everything" instead.
+    setVisParam(
+      current.size === 0 || current.size === all.length
+        ? null
+        : all.filter((id) => current.has(id)).join(","),
+    );
+  };
   // Handlers below change two or three keys at once, which needs a single
   // navigation rather than a sequence of single-key setters.
   const setParams = useUrlParams();
@@ -313,6 +336,9 @@ function OccupancyBody({
                       const picked = cells.find((c) => c.id === id);
                       setParams({ rack: picked?.rackId ?? null, cell: id });
                     }}
+                    visibleVisuals={visibleVisuals}
+                    onToggleVisual={toggleVisual}
+                    onResetVisuals={() => setVisParam(null)}
                     height={430}
                   />
                 </Suspense>
