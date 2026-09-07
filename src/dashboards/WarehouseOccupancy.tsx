@@ -53,6 +53,13 @@ import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
 import { SCOPE_NOTES } from "./scope";
 import { useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+import type { Facet } from "@/query/search";
+
+const AISLE_SERIES = [
+  { key: "occupied", name: "Occupied", fill: "var(--o-action)", occupied: true },
+  { key: "free", name: "Not occupied", fill: "var(--o-occ-empty)", occupied: false },
+] as const;
 
 export function WarehouseOccupancyDashboard() {
   return (
@@ -61,15 +68,19 @@ export function WarehouseOccupancyDashboard() {
       modelName="cell"
       description="Installed pallet positions and how they are used, by warehouse, aisle, rack and level. Select any rack to open its elevation and any position to inspect it."
     >
-      {({ scope }) => <OccupancyBody scope={scope} />}
+      {({ scope, state }) => (
+        <OccupancyBody scope={scope} carry={state.facets} />
+      )}
     </DashboardFrame>
   );
 }
 
 function OccupancyBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const rows = useScopedRows(scope);
   const cells = rows.cells;
@@ -84,6 +95,7 @@ function OccupancyBody({
   // Handlers below change two or three keys at once, which needs a single
   // navigation rather than a sequence of single-key setters.
   const setParams = useUrlParams();
+  const drill = useDrilldown(carry);
 
   const warehouses = rows.warehouses;
   const activeWarehouseId = warehouseId || warehouses[0]?.id || "";
@@ -213,7 +225,7 @@ function OccupancyBody({
           height={230}
           footer="An empty pallet still occupies its position until it is removed or relocated."
         >
-          <PalletUtilisation cells={cells} />
+          <PalletUtilisation cells={cells} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -395,7 +407,10 @@ function OccupancyBody({
           height={250}
           footer="Select a bar to open the positions in that aisle."
         >
-          <AisleChart cells={cells.filter((c) => c.warehouseId === activeWarehouseId)} />
+          <AisleChart
+            cells={cells.filter((c) => c.warehouseId === activeWarehouseId)}
+            drill={drill}
+          />
         </ChartCard>
 
         <ChartCard
@@ -404,7 +419,10 @@ function OccupancyBody({
           height={250}
           footer="Level 0 is the ground position."
         >
-          <LevelChart cells={cells.filter((c) => c.warehouseId === activeWarehouseId)} />
+          <LevelChart
+            cells={cells.filter((c) => c.warehouseId === activeWarehouseId)}
+            drill={drill}
+          />
         </ChartCard>
       </PanelGrid>
 
@@ -527,7 +545,7 @@ function WarehouseComparison({
   );
 }
 
-function PalletUtilisation({ cells }: { cells: CellRow[] }) {
+function PalletUtilisation({ cells, drill }: { cells: CellRow[]; drill: DrilldownFn }) {
   const data = useMemo(() => {
     const occupied = cells.filter((c) => c.occupied);
     return (["full", "partial", "empty"] as const).map((status) => ({
@@ -547,7 +565,28 @@ function PalletUtilisation({ cells }: { cells: CellRow[] }) {
       <PieChart>
         <Tooltip content={<ChartTooltip unit="pallets" />} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Pie data={data} dataKey="value" nameKey="label" innerRadius={48} outerRadius={86}>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="label"
+          innerRadius={48}
+          outerRadius={86}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ key: string; label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "pallet",
+              facets: [
+                contextFacet(
+                  "Pallet Status",
+                  [datum.label],
+                  cond("status", "eq", datum.key),
+                ),
+              ],
+            });
+          }}
+        >
           {data.map((entry) => (
             <ReCell
               key={entry.key}
@@ -560,7 +599,7 @@ function PalletUtilisation({ cells }: { cells: CellRow[] }) {
   );
 }
 
-function AisleChart({ cells }: { cells: CellRow[] }) {
+function AisleChart({ cells, drill }: { cells: CellRow[]; drill: DrilldownFn }) {
   const data = useMemo(() => {
     const byAisle = new Map<string, { label: string; occupied: number; free: number }>();
     for (const cell of cells) {
@@ -583,20 +622,43 @@ function AisleChart({ cells }: { cells: CellRow[] }) {
         <YAxis {...AXIS_PROPS} width={56} allowDecimals={false} />
         <Tooltip content={<ChartTooltip unit="positions" />} cursor={{ fill: "var(--o-hover-bg)" }} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Bar maxBarSize={64} dataKey="occupied" name="Occupied" stackId="a" fill="var(--o-action)" />
-        <Bar maxBarSize={64}
-          dataKey="free"
-          name="Not occupied"
-          stackId="a"
-          fill="var(--o-occ-empty)"
-          radius={[3, 3, 0, 0]}
-        />
+        {AISLE_SERIES.map((series) => (
+          <Bar
+            maxBarSize={64}
+            key={series.key}
+            dataKey={series.key}
+            name={series.name}
+            stackId="a"
+            fill={series.fill}
+            radius={series.key === "free" ? [3, 3, 0, 0] : undefined}
+            style={CLICKABLE}
+            onClick={(arg: unknown) => {
+              const datum = payloadOf<{ label: string }>(arg);
+              if (!datum) return;
+              drill({
+                model: "cell",
+                facets: [
+                  contextFacet(
+                    "Aisle",
+                    [datum.label],
+                    cond("aisleCode", "eq", datum.label),
+                  ),
+                  contextFacet(
+                    "Occupancy",
+                    [series.name],
+                    cond("occupied", "eq", series.occupied),
+                  ),
+                ],
+              });
+            }}
+          />
+        ))}
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-function LevelChart({ cells }: { cells: CellRow[] }) {
+function LevelChart({ cells, drill }: { cells: CellRow[]; drill: DrilldownFn }) {
   const data = useMemo(() => {
     const byLevel = new Map<number, { level: number; occupied: number; total: number }>();
     for (const cell of cells) {
@@ -609,6 +671,7 @@ function LevelChart({ cells }: { cells: CellRow[] }) {
       .sort((a, b) => a.level - b.level)
       .map((entry) => ({
         label: entry.level === 0 ? "Ground" : `L${entry.level}`,
+        level: entry.level,
         occupancy: entry.total ? Math.round((entry.occupied / entry.total) * 1000) / 10 : 0,
         occupied: entry.occupied,
         total: entry.total,
@@ -636,7 +699,27 @@ function LevelChart({ cells }: { cells: CellRow[] }) {
           }
           cursor={{ fill: "var(--o-hover-bg)" }}
         />
-        <Bar maxBarSize={64} dataKey="occupancy" name="Occupancy" radius={[3, 3, 0, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="occupancy"
+          name="Occupancy"
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ level: number; label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "cell",
+              facets: [
+                contextFacet(
+                  "Row / Level",
+                  [datum.label],
+                  cond("level", "eq", datum.level),
+                ),
+              ],
+            });
+          }}
+        >
           {data.map((entry) => (
             <ReCell key={entry.label} fill={occupancyColor(entry.occupancy)} />
           ))}

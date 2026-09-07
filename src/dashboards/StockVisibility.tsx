@@ -37,13 +37,57 @@ import {
   seriesColor,
   shortLabel,
 } from "@/odoo/charts";
-import { formatInt, formatNumber, formatQty } from "@/odoo/format";
-import { cond, or } from "@/query/domain";
+import { formatInt, formatNumber } from "@/odoo/format";
+import { and, cond, or, type DomainNode } from "@/query/domain";
 import { groupKeyFor } from "@/query/group";
+import type { Facet } from "@/query/search";
 import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
 import { SCOPE_NOTES } from "./scope";
 import { distinct, sumIn, tally, unitsPresent, useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+
+/** Bar name built outside JSX so the patchable markup stays plain. */
+const QUANTITY_LABEL = (unit: string) => `Quantity (${unit})`;
+
+const AVAILABILITY_SERIES = [
+  {
+    key: "available",
+    name: "Available to pick",
+    field: "availableQuantity",
+    fill: "var(--o-series-2)",
+  },
+  {
+    key: "reserved",
+    name: "Reserved",
+    field: "reservedQuantity",
+    fill: "var(--o-occ-partial)",
+  },
+] as const;
+
+/**
+ * A week key from `groupKeyFor` is an ISO-ish "YYYY-Www" token. The movement
+ * list filters on a date range, so the key is turned back into the seven days
+ * it stands for.
+ */
+function weekDomain(key: string): DomainNode {
+  const match = /^(\d{4})-W(\d{2})$/.exec(key);
+  if (!match) return cond("movementDate", "eq", key);
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  // ISO week 1 contains 4 January.
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const isoMonday = new Date(jan4);
+  isoMonday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+  const start = new Date(isoMonday);
+  start.setUTCDate(isoMonday.getUTCDate() + (week - 1) * 7);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  return and(
+    cond("movementDate", "gte", start.toISOString().slice(0, 10)),
+    cond("movementDate", "lte", end.toISOString().slice(0, 10)),
+  );
+}
 
 const MATERIAL_LABEL: Record<string, string> = {
   RM: "Raw Material",
@@ -58,19 +102,26 @@ export function StockVisibilityDashboard() {
       modelName="stock"
       description="Live stock across every warehouse, with reservations and what is genuinely available to pick. Each figure opens the stock lines behind it."
     >
-      {({ scope }) => <StockVisibilityBody scope={scope} />}
+      {({ scope, state }) => (
+        <StockVisibilityBody scope={scope} carry={state.facets} />
+      )}
     </DashboardFrame>
   );
 }
 
 function StockVisibilityBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const rows = useScopedRows(scope);
   const stock = rows.stock;
   const [unit, setUnit] = useUrlParam("unit");
+  // Every chart click opens the records behind the slice, carrying the
+  // dashboard's own filters with it.
+  const drill = useDrilldown(carry);
 
   const units = useMemo(() => unitsPresent(stock), [stock]);
   const activeUnit = unit || units[0]?.unit || "kg";
@@ -164,7 +215,7 @@ function StockVisibilityBody({
           hint="On-hand quantity per warehouse, split by material group."
           footer="Select a bar to open the stock lines for that warehouse."
         >
-          <WarehouseChart rows={inUnit} unit={activeUnit} />
+          <WarehouseChart rows={inUnit} unit={activeUnit} drill={drill} />
         </ChartCard>
 
         <ChartCard
@@ -172,7 +223,7 @@ function StockVisibilityBody({
           hint="Loaded pallets per material group. Counted in pallets rather than quantity so RM, FG and PM stay comparable across their different units of measure."
           footer="Counted in pallets, not quantity, because the three groups use different units."
         >
-          <MaterialChart rows={stock} />
+          <MaterialChart rows={stock} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -183,7 +234,7 @@ function StockVisibilityBody({
           height={260}
           footer="Reserved plus available equals on hand. Reservations never reduce on-hand quantity."
         >
-          <AvailabilityChart rows={inUnit} unit={activeUnit} />
+          <AvailabilityChart rows={inUnit} unit={activeUnit} drill={drill} />
         </ChartCard>
 
         <ChartCard
@@ -192,7 +243,7 @@ function StockVisibilityBody({
           height={260}
           footer="Select a bar to open that product's stock breakdown."
         >
-          <ProductChart rows={inUnit} unit={activeUnit} />
+          <ProductChart rows={inUnit} unit={activeUnit} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -203,7 +254,7 @@ function StockVisibilityBody({
           height={240}
           footer="Select a bucket to open the stock lines in that age band."
         >
-          <AgingChart rows={stock} unit={activeUnit} />
+          <AgingChart rows={stock} unit={activeUnit} drill={drill} />
         </ChartCard>
 
         <ChartCard
@@ -212,7 +263,7 @@ function StockVisibilityBody({
           height={240}
           footer={SCOPE_NOTES.movementPeriod}
         >
-          <TrendChart rows={rows.movements} />
+          <TrendChart rows={rows.movements} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -300,7 +351,15 @@ function UnitPanel({
   );
 }
 
-function WarehouseChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
+function WarehouseChart({
+  rows,
+  unit,
+  drill,
+}: {
+  rows: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(() => {
     const byWarehouse = new Map<
       string,
@@ -330,13 +389,34 @@ function WarehouseChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
         {(["RM", "FG", "PM"] as const).map((group) => (
-          <Bar maxBarSize={64}
+          <Bar
+            maxBarSize={64}
             key={group}
             dataKey={group}
             name={MATERIAL_LABEL[group]}
             stackId="a"
             fill={MATERIAL_COLORS[group]}
             radius={group === "PM" ? [3, 3, 0, 0] : undefined}
+            style={CLICKABLE}
+            onClick={(arg: unknown) => {
+              const datum = payloadOf<{ label: string }>(arg);
+              if (!datum) return;
+              drill({
+                model: "stock",
+                facets: [
+                  contextFacet(
+                    "Warehouse",
+                    [datum.label],
+                    cond("warehouseCode", "eq", datum.label),
+                  ),
+                  contextFacet(
+                    "Material Group",
+                    [MATERIAL_LABEL[group]],
+                    cond("materialGroup", "eq", group),
+                  ),
+                ],
+              });
+            }}
           />
         ))}
       </BarChart>
@@ -344,7 +424,7 @@ function WarehouseChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
   );
 }
 
-function MaterialChart({ rows }: { rows: StockRow[] }) {
+function MaterialChart({ rows, drill }: { rows: StockRow[]; drill: DrilldownFn }) {
   const data = useMemo(
     () =>
       tally(rows, "materialGroup", (list) => {
@@ -360,7 +440,28 @@ function MaterialChart({ rows }: { rows: StockRow[] }) {
       <PieChart>
         <Tooltip content={<ChartTooltip unit="pallets" />} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Pie data={data} dataKey="value" nameKey="label" innerRadius={52} outerRadius={92}>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="label"
+          innerRadius={52}
+          outerRadius={92}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ key: string; label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "pallet",
+              facets: [
+                contextFacet(
+                  "Material Group",
+                  [datum.label],
+                  cond("materialGroup", "eq", datum.key),
+                ),
+              ],
+            });
+          }}
+        >
           {data.map((entry) => (
             <Cell
               key={entry.key}
@@ -373,7 +474,15 @@ function MaterialChart({ rows }: { rows: StockRow[] }) {
   );
 }
 
-function AvailabilityChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
+function AvailabilityChart({
+  rows,
+  unit,
+  drill,
+}: {
+  rows: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(() => {
     const byWarehouse = new Map<string, { label: string; available: number; reserved: number }>();
     for (const row of rows) {
@@ -398,20 +507,47 @@ function AvailabilityChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
         <YAxis {...AXIS_PROPS} width={72} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Bar maxBarSize={64} dataKey="available" name="Available to pick" stackId="a" fill="var(--o-series-2)" />
-        <Bar maxBarSize={64}
-          dataKey="reserved"
-          name="Reserved"
-          stackId="a"
-          fill="var(--o-occ-partial)"
-          radius={[3, 3, 0, 0]}
-        />
+        {AVAILABILITY_SERIES.map((series) => (
+          <Bar
+            maxBarSize={64}
+            key={series.key}
+            dataKey={series.key}
+            name={series.name}
+            stackId="a"
+            fill={series.fill}
+            radius={series.key === "reserved" ? [3, 3, 0, 0] : undefined}
+            style={CLICKABLE}
+            onClick={(arg: unknown) => {
+              const datum = payloadOf<{ label: string }>(arg);
+              if (!datum) return;
+              drill({
+                model: "stock",
+                facets: [
+                  contextFacet(
+                    "Warehouse",
+                    [datum.label],
+                    cond("warehouseCode", "eq", datum.label),
+                  ),
+                  contextFacet(series.name, ["> 0"], cond(series.field, "gt", 0)),
+                ],
+              });
+            }}
+          />
+        ))}
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-function ProductChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
+function ProductChart({
+  rows,
+  unit,
+  drill,
+}: {
+  rows: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(
     () =>
       tally(
@@ -442,7 +578,27 @@ function ProductChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
           tickFormatter={(v: string) => shortLabel(v, 26)}
         />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name="On hand" radius={[0, 3, 3, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name="On hand"
+          radius={[0, 3, 3, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet(
+                  "Product",
+                  [datum.label],
+                  cond("productName", "eq", datum.label),
+                ),
+              ],
+            });
+          }}
+        >
           {data.map((entry, i) => (
             <Cell key={entry.key} fill={seriesColor(i)} />
           ))}
@@ -452,7 +608,15 @@ function ProductChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
   );
 }
 
-function AgingChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
+function AgingChart({
+  rows,
+  unit,
+  drill,
+}: {
+  rows: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(
     () =>
       AGE_BUCKETS.map((bucket) => {
@@ -495,13 +659,34 @@ function AgingChart({ rows, unit }: { rows: StockRow[]; unit: string }) {
           }
           cursor={{ fill: "var(--o-hover-bg)" }}
         />
-        <Bar maxBarSize={64} dataKey="quantity" name={`Quantity (${unit})`} fill="var(--o-series-1)" radius={[3, 3, 0, 0]} />
+        <Bar
+          maxBarSize={64}
+          dataKey="quantity"
+          name={QUANTITY_LABEL(unit)}
+          fill="var(--o-series-1)"
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ key: string; label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet(
+                  "Stock Age",
+                  [datum.label],
+                  cond("ageBucket", "eq", datum.key),
+                ),
+              ],
+            });
+          }}
+        />
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-function TrendChart({ rows }: { rows: MovementRow[] }) {
+function TrendChart({ rows, drill }: { rows: MovementRow[]; drill: DrilldownFn }) {
   const data = useMemo(() => {
     const done = rows.filter((r) => r.state === "done" && r.doneAt);
     const byWeek = new Map<
@@ -528,7 +713,25 @@ function TrendChart({ rows }: { rows: MovementRow[] }) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+      <LineChart
+        data={data}
+        margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+        style={CLICKABLE}
+        onClick={(arg: unknown) => {
+          const datum = payloadOf<{ key: string; label: string }>(arg);
+          if (!datum) return;
+          drill({
+            model: "movement",
+            facets: [
+              contextFacet(
+                "Movement Week",
+                [datum.label],
+                weekDomain(datum.key),
+              ),
+            ],
+          });
+        }}
+      >
         <CartesianGrid {...GRID_PROPS} />
         <XAxis dataKey="label" {...AXIS_PROPS} interval="preserveStartEnd" />
         <YAxis {...AXIS_PROPS} width={48} allowDecimals={false} />
@@ -563,6 +766,15 @@ function TrendChart({ rows }: { rows: MovementRow[] }) {
   );
 }
 
+/**
+ * Ways out of the dashboard.
+ *
+ * This deliberately holds no records. A dashboard that prints its own table of
+ * stock lines is just a worse list view: it cannot be sorted, grouped, paged or
+ * exported, and it invites people to read eight rows and assume they have seen
+ * the data. Every figure and every chart segment on this page already opens the
+ * real list; these are the shortcuts that do not correspond to a single visual.
+ */
 function LinkedRecords({
   stock,
   activeUnit,
@@ -570,25 +782,29 @@ function LinkedRecords({
   stock: StockRow[];
   activeUnit: string;
 }) {
-  const recent = useMemo(
-    () => stock.slice().sort((a, b) => b.quantity - a.quantity).slice(0, 8),
-    [stock],
-  );
+  const lines = stock.filter((row) => row.uom === activeUnit).length;
 
   return (
     <section className="o-card p-3">
-      <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h3 className="text-[var(--o-fs-sm)] font-medium text-[var(--o-gray-700)] m-0">
-          Linked stock records
-        </h3>
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="o-section-heading text-[var(--o-fs-lg)]">
+            Open the records
+          </h3>
+          <p className="mt-0.5 mb-0 text-[var(--o-fs-xs)] text-[var(--o-text-muted)]">
+            Select any figure or chart segment above to open exactly the records
+            behind it. These shortcuts cover the scopes that do not have a
+            visual of their own.
+          </p>
+        </div>
         <div className="flex gap-2 flex-wrap">
           <Link
-            className="o-btn o-btn-secondary o-btn-sm"
+            className="o-btn o-btn-primary o-btn-sm"
             to={listUrl("stock", [
               contextFacet("Unit", [activeUnit], cond("uom", "eq", activeUnit)),
             ])}
           >
-            All stock lines in {activeUnit}
+            All {formatInt(lines)} stock lines in {activeUnit}
           </Link>
           <Link
             className="o-btn o-btn-secondary o-btn-sm"
@@ -611,48 +827,17 @@ function LinkedRecords({
           >
             Older than 180 days
           </Link>
+          <Link className="o-btn o-btn-secondary o-btn-sm" to="/pallets">
+            Pallets
+          </Link>
+          <Link className="o-btn o-btn-secondary o-btn-sm" to="/lots">
+            Lots
+          </Link>
+          <Link className="o-btn o-btn-secondary o-btn-sm" to="/movements">
+            Movements
+          </Link>
         </div>
       </div>
-      <table className="o-list">
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Lot</th>
-            <th>Pallet</th>
-            <th>Location</th>
-            <th style={{ textAlign: "right" }}>On hand</th>
-            <th style={{ textAlign: "right" }}>Available</th>
-            <th style={{ textAlign: "right" }}>Age</th>
-          </tr>
-        </thead>
-        <tbody>
-          {recent.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <Link to={`/products/${row.productId}`}>{row.productName}</Link>
-              </td>
-              <td>{row.lotId ? <Link to={`/lots/${row.lotId}`}>{row.lotName}</Link> : "-"}</td>
-              <td>
-                {row.palletId ? (
-                  <Link to={`/pallets/${row.palletId}`}>{row.palletName}</Link>
-                ) : (
-                  "-"
-                )}
-              </td>
-              <td className="o-truncate" title={row.completeName}>
-                {row.completeName}
-              </td>
-              <td className="num">{formatQty(row.quantity, row.uom)}</td>
-              <td className="num">{formatQty(row.availableQuantity, row.uom)}</td>
-              <td className="num">{formatInt(row.ageDays)} d</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-2 text-[var(--o-fs-xxs)] text-[var(--o-text-subtle)]">
-        Showing the eight largest stock lines in scope. Use the buttons above, or
-        any figure on this page, to open the full filtered list.
-      </p>
     </section>
   );
 }

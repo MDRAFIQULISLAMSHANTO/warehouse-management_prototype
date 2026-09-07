@@ -8,7 +8,6 @@
  */
 
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -23,14 +22,21 @@ import { contextFacet, listUrl, thresholdFacet } from "@/app/links";
 import type { PalletRow } from "@/data/derive";
 import { useUrlParam } from "@/hooks/useSearchState";
 import { AXIS_PROPS, ChartCard, ChartTooltip, GRID_PROPS, seriesColor } from "@/odoo/charts";
-import { FillBar, formatInt, formatNumber, formatQty } from "@/odoo/format";
+import { formatInt, formatNumber, formatQty } from "@/odoo/format";
 import { EmptyState } from "@/odoo/primitives";
-import { cond } from "@/query/domain";
-import { suggestConsolidation } from "@/store/apply";
-import { useAppStore } from "@/store/appStore";
+import { and, cond } from "@/query/domain";
 import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
+import { RecordsPanel } from "./RecordsPanel";
 import { distinct, unitsPresent, useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+import type { Facet } from "@/query/search";
+
+const GROUP_LABEL: Record<string, string> = {
+  warehouseCode: "Warehouse",
+  productName: "Product",
+  aisleCode: "Aisle",
+};
 
 const BANDS = [
   { id: "0-25", label: "1-25%", min: 0.0001, max: 25 },
@@ -47,17 +53,22 @@ export function PartialPalletDashboard() {
       description="Pallets holding stock but not a full load. Consolidating them frees whole positions without moving any stock off site."
       base={{ pallet: cond("status", "eq", "partial") }}
     >
-      {({ scope }) => <PartialBody scope={scope} />}
+      {({ scope, state }) => (
+        <PartialBody scope={scope} carry={state.facets} />
+      )}
     </DashboardFrame>
   );
 }
 
 function PartialBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const rows = useScopedRows(scope);
+  const drill = useDrilldown(carry);
   const partials = rows.pallets;
   const [band, setBand] = useUrlParam("band");
 
@@ -185,7 +196,7 @@ function PartialBody({
           title="Fill percentage distribution"
           hint="How full the partial pallets are."
           height={240}
-          footer="Select a band to filter the pallet table below."
+          footer="Select a band to narrow the panel below to those pallets."
         >
           <BandChart
             partials={partials}
@@ -199,7 +210,7 @@ function PartialBody({
           hint="Where the part loads are."
           height={240}
         >
-          <GroupChart rows={partials} field="warehouseCode" />
+          <GroupChart drill={drill} rows={partials} field="warehouseCode" />
         </ChartCard>
       </PanelGrid>
 
@@ -209,7 +220,7 @@ function PartialBody({
           hint="The twelve products with the most part loads."
           height={260}
         >
-          <GroupChart rows={partials} field="productName" limit={12} horizontal />
+          <GroupChart drill={drill} rows={partials} field="productName" limit={12} horizontal />
         </ChartCard>
 
         <ChartCard
@@ -217,7 +228,7 @@ function PartialBody({
           hint="Aisle distribution, so a consolidation run can be planned by area."
           height={260}
         >
-          <GroupChart rows={partials} field="aisleCode" />
+          <GroupChart drill={drill} rows={partials} field="aisleCode" />
         </ChartCard>
       </PanelGrid>
 
@@ -278,11 +289,13 @@ function GroupChart({
   field,
   limit,
   horizontal,
+  drill,
 }: {
   rows: PalletRow[];
   field: "warehouseCode" | "productName" | "aisleCode";
   limit?: number;
   horizontal?: boolean;
+  drill: DrilldownFn;
 }) {
   const data = useMemo(() => {
     const counts = new Map<string, number>();
@@ -324,10 +337,31 @@ function GroupChart({
           </>
         )}
         <Tooltip content={<ChartTooltip unit="pallets" />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64}
+        <Bar
+          maxBarSize={64}
           dataKey="value"
           name="Partial pallets"
           radius={horizontal ? [0, 3, 3, 0] : [3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "pallet",
+              facets: [
+                contextFacet(
+                  "Pallet Status",
+                  ["Partially filled"],
+                  cond("status", "eq", "partial"),
+                ),
+                contextFacet(
+                  GROUP_LABEL[field],
+                  [datum.label],
+                  cond(field, "eq", datum.label),
+                ),
+              ],
+            });
+          }}
         >
           {data.map((entry, i) => (
             <ReCell key={entry.label} fill={seriesColor(i)} />
@@ -347,111 +381,44 @@ function PalletTable({
   band: string;
   onClearBand: () => void;
 }) {
-  const data = useAppStore((s) => s.data);
-  const shown = useMemo(
-    () => pallets.slice().sort((a, b) => (a.fillPct ?? 0) - (b.fillPct ?? 0)).slice(0, 20),
-    [pallets],
-  );
+  const bandLabel = BANDS.find((b) => b.id === band)?.label;
 
   return (
-    <section className="o-card p-3">
-      <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h3 className="text-[var(--o-fs-sm)] font-medium text-[var(--o-gray-700)] m-0">
-          Partial pallets and consolidation candidates
-          {band && (
-            <button type="button" className="o-btn o-btn-link ml-2" onClick={onClearBand}>
-              clear {band}% band
-            </button>
-          )}
-        </h3>
-        <Link
-          className="o-btn o-btn-secondary o-btn-sm"
-          to={listUrl("pallet", [
-            contextFacet(
-              "Pallet Status",
-              ["Partially filled"],
-              cond("status", "eq", "partial"),
-            ),
-          ])}
-        >
-          Open all {formatInt(pallets.length)}
-        </Link>
-      </div>
-
-      <table className="o-list">
-        <thead>
-          <tr>
-            <th>Pallet</th>
-            <th>Location</th>
-            <th>Product</th>
-            <th>Lot</th>
-            <th style={{ textAlign: "right" }}>On pallet</th>
-            <th style={{ textAlign: "right" }}>Capacity basis</th>
-            <th style={{ textAlign: "right" }}>Remaining</th>
-            <th style={{ width: 150 }}>Fill</th>
-            <th>Consolidate into</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((pallet) => {
-            const candidates = suggestConsolidation(data, pallet.id, 2);
-            return (
-              <tr key={pallet.id}>
-                <td>
-                  <Link to={`/pallets/${pallet.id}`}>{pallet.name}</Link>
-                </td>
-                <td className="o-truncate" title={pallet.completeName}>
-                  {pallet.completeName}
-                </td>
-                <td className="o-truncate">{pallet.productName}</td>
-                <td>
-                  {pallet.lotId ? (
-                    <Link to={`/lots/${pallet.lotId}`}>{pallet.lotName}</Link>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="num">{formatQty(pallet.quantity, pallet.uom)}</td>
-                <td className="num" title="Explicit product or variant pallet capacity">
-                  {formatQty(pallet.capacityQty ?? 0, pallet.uom)}
-                </td>
-                <td className="num">{formatQty(pallet.remainingQty ?? 0, pallet.uom)}</td>
-                <td>
-                  <FillBar value={pallet.fillPct} width={80} />
-                </td>
-                <td>
-                  {candidates.length ? (
-                    <div className="flex flex-col gap-0.5">
-                      {candidates.map((candidate) => (
-                        <Link
-                          key={candidate.palletId}
-                          to={`/pallets/${candidate.palletId}`}
-                          className="text-[var(--o-fs-xs)]"
-                          title={`${candidate.completeName} - ${formatQty(candidate.remaining, candidate.uom)} of room`}
-                        >
-                          {candidate.palletName} (+
-                          {formatNumber(candidate.remaining, 0)} {candidate.uom})
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[var(--o-text-subtle)] text-[var(--o-fs-xs)]">
-                      No compatible pallet
-                    </span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <p className="mt-2 text-[var(--o-fs-xxs)] text-[var(--o-text-subtle)]">
-        Consolidation rule used here is deliberately conservative: same product,
-        same variant, same lot, and enough remaining capacity to absorb the whole
-        quantity. Anything looser would need a business decision about mixing
-        lots on one pallet.
-      </p>
-    </section>
+    <RecordsPanel
+      label={
+        bandLabel
+          ? `partially filled pallets in the ${bandLabel} band`
+          : "partially filled pallets"
+      }
+      count={pallets.length}
+      model="pallet"
+      facets={[
+        contextFacet(
+          "Pallet Status",
+          ["Partially filled"],
+          cond("status", "eq", "partial"),
+        ),
+        ...(bandLabel
+          ? [
+              contextFacet(
+                "Fill %",
+                [bandLabel],
+                and(
+                  cond("fillPct", "gt", BANDS.find((b) => b.id === band)!.min),
+                  cond("fillPct", "lte", BANDS.find((b) => b.id === band)!.max),
+                ),
+              ),
+            ]
+          : []),
+      ]}
+      note="The pallet list shows the capacity basis, remaining room and consolidation candidate for every row."
+    >
+      {bandLabel && (
+        <button type="button" className="o-btn o-btn-secondary o-btn-sm" onClick={onClearBand}>
+          Clear {bandLabel} band
+        </button>
+      )}
+    </RecordsPanel>
   );
 }
+

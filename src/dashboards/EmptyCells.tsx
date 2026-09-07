@@ -33,7 +33,10 @@ import { suggestCellsForProduct } from "@/store/apply";
 import { useAppStore, useDerived } from "@/store/appStore";
 import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
+import { RecordsPanel } from "./RecordsPanel";
 import { useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+import type { Facet } from "@/query/search";
 
 type Category = "empty" | "available" | "reserved" | "blocked";
 
@@ -51,6 +54,11 @@ const CATEGORY_DOMAIN = {
   blocked: cond("status", "eq", "blocked"),
 } as const;
 
+const CAPACITY_SERIES = [
+  { key: "matching", name: "In this category", fill: "var(--o-action)" },
+  { key: "total", name: "Installed positions", fill: "var(--o-occ-empty)" },
+] as const;
+
 export function EmptyCellDashboard() {
   return (
     <DashboardFrame
@@ -58,17 +66,22 @@ export function EmptyCellDashboard() {
       modelName="cell"
       description="Where there is room to put stock away, and where there only appears to be. Choose a category to highlight it on the map and list the exact positions."
     >
-      {({ scope }) => <EmptyCellBody scope={scope} />}
+      {({ scope, state }) => (
+        <EmptyCellBody scope={scope} carry={state.facets} />
+      )}
     </DashboardFrame>
   );
 }
 
 function EmptyCellBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const rows = useScopedRows(scope);
+  const drill = useDrilldown(carry);
   const cells = rows.cells;
   const [category, setCategory] = useUrlParam("cat", "available");
   const active = (category as Category) || "available";
@@ -190,14 +203,30 @@ function EmptyCellBody({
           hint="Positions available for put-away in each warehouse."
           height={230}
         >
-          <CapacityChart cells={cells} bucket={buckets[active]} keyField="warehouseCode" />
+          <CapacityChart
+            cells={cells}
+            bucket={buckets[active]}
+            keyField="warehouseCode"
+            drill={drill}
+            categoryFacet={() =>
+              contextFacet("Category", [CATEGORY_LABEL[active]], CATEGORY_DOMAIN[active])
+            }
+          />
         </ChartCard>
         <ChartCard
           title={`${CATEGORY_LABEL[active]} by level`}
           hint="Which levels carry the free space."
           height={230}
         >
-          <CapacityChart cells={cells} bucket={buckets[active]} keyField="level" />
+          <CapacityChart
+            cells={cells}
+            bucket={buckets[active]}
+            keyField="level"
+            drill={drill}
+            categoryFacet={() =>
+              contextFacet("Category", [CATEGORY_LABEL[active]], CATEGORY_DOMAIN[active])
+            }
+          />
         </ChartCard>
       </PanelGrid>
 
@@ -287,10 +316,14 @@ function CapacityChart({
   cells,
   bucket,
   keyField,
+  drill,
+  categoryFacet,
 }: {
   cells: CellRow[];
   bucket: CellRow[];
   keyField: "warehouseCode" | "level";
+  drill: DrilldownFn;
+  categoryFacet: () => Facet;
 }) {
   const data = useMemo(() => {
     const totals = new Map<string, { label: string; total: number; matching: number }>();
@@ -311,9 +344,9 @@ function CapacityChart({
       const entry = totals.get(key);
       if (entry) entry.matching += 1;
     }
-    return Array.from(totals.values()).sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { numeric: true }),
-    );
+    return Array.from(totals.values())
+      .map((entry) => ({ ...entry, keyField }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
   }, [cells, bucket, keyField]);
 
   return (
@@ -323,8 +356,48 @@ function CapacityChart({
         <XAxis dataKey="label" {...AXIS_PROPS} />
         <YAxis {...AXIS_PROPS} width={56} allowDecimals={false} />
         <Tooltip content={<ChartTooltip unit="positions" />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="matching" name="In this category" fill="var(--o-action)" radius={[3, 3, 0, 0]} />
-        <Bar maxBarSize={64} dataKey="total" name="Installed positions" fill="var(--o-occ-empty)" radius={[3, 3, 0, 0]} />
+        {CAPACITY_SERIES.map((series) => (
+          <Bar
+            maxBarSize={64}
+            key={series.key}
+            dataKey={series.key}
+            name={series.name}
+            fill={series.fill}
+            radius={[3, 3, 0, 0]}
+            style={CLICKABLE}
+            onClick={(arg: unknown) => {
+              const datum = payloadOf<{ label: string }>(arg);
+              if (!datum) return;
+              const scopeFacet =
+                keyField === "level"
+                  ? contextFacet(
+                      "Row / Level",
+                      [datum.label],
+                      cond(
+                        "level",
+                        "eq",
+                        datum.label === "Ground"
+                          ? 0
+                          : Number(datum.label.replace("L", "")),
+                      ),
+                    )
+                  : contextFacet(
+                      "Warehouse",
+                      [datum.label],
+                      cond("warehouseCode", "eq", datum.label),
+                    );
+              drill({
+                model: "cell",
+                // "Installed positions" is the whole bar, so it opens the
+                // scope without the category condition on top.
+                facets:
+                  series.key === "matching"
+                    ? [scopeFacet, categoryFacet()]
+                    : [scopeFacet],
+              });
+            }}
+          />
+        ))}
       </BarChart>
     </ResponsiveContainer>
   );
@@ -457,70 +530,20 @@ function SuggestionPanel({ warehouseId }: { warehouseId: string }) {
 }
 
 function CellTable({ cells, category }: { cells: CellRow[]; category: Category }) {
-  const shown = cells.slice(0, 25);
   return (
-    <section className="o-card p-3">
-      <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h3 className="text-[var(--o-fs-sm)] font-medium text-[var(--o-gray-700)] m-0">
-          {CATEGORY_LABEL[category]} positions
-        </h3>
-        <Link
-          className="o-btn o-btn-secondary o-btn-sm"
-          to={listUrl("cell", [
-            contextFacet(
-              "Category",
-              [CATEGORY_LABEL[category]],
-              CATEGORY_DOMAIN[category],
-            ),
-          ])}
-        >
-          Open all {formatInt(cells.length)}
-        </Link>
-      </div>
-      <table className="o-list">
-        <thead>
-          <tr>
-            <th>Position</th>
-            <th>Warehouse</th>
-            <th>Aisle</th>
-            <th>Rack</th>
-            <th style={{ textAlign: "right" }}>Bay</th>
-            <th style={{ textAlign: "right" }}>Level</th>
-            <th>Storage category</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((cell) => (
-            <tr key={cell.id}>
-              <td>
-                <Link to={`/locations/cells/${cell.id}`}>{cell.completeName}</Link>
-              </td>
-              <td>{cell.warehouseCode}</td>
-              <td>{cell.aisleCode}</td>
-              <td>
-                <Link to={`/locations/racks/${cell.rackId}`}>{cell.rackCode}</Link>
-              </td>
-              <td className="num">{cell.bay}</td>
-              <td className="num">{cell.level === 0 ? "G" : cell.level}</td>
-              <td>{cell.storageCategoryName ?? "-"}</td>
-              <td className="text-[var(--o-text-muted)]">
-                {cell.blocked
-                  ? cell.blockNote
-                  : cell.reservedIncoming
-                    ? "Destination of a pending operation"
-                    : "Ready for put-away"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {cells.length > shown.length && (
-        <p className="mt-2 text-[var(--o-fs-xxs)] text-[var(--o-text-subtle)]">
-          Showing {shown.length} of {formatInt(cells.length)}. Use the button
-          above to open the full filtered list.
-        </p>
-      )}
-    </section>
+    <RecordsPanel
+      label={`positions ${CATEGORY_LABEL[category].toLowerCase()}`}
+      count={cells.length}
+      model="cell"
+      facets={[
+        contextFacet(
+          "Category",
+          [CATEGORY_LABEL[category]],
+          CATEGORY_DOMAIN[category],
+        ),
+      ]}
+      note="The position list carries the full address, storage category, rack profile and blocking reason, and can be grouped, sorted and exported."
+    />
   );
 }
+

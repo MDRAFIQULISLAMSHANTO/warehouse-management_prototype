@@ -23,19 +23,22 @@ import {
   YAxis,
 } from "recharts";
 import { contextFacet, listUrl } from "@/app/links";
-import { AGE_BUCKETS, formatDate } from "@/data/clock";
+import { AGE_BUCKETS } from "@/data/clock";
 import type { MovementRow, StockRow } from "@/data/derive";
 import { useUrlParam } from "@/hooks/useSearchState";
 import { SearchableSelect } from "@/odoo/CustomFilter";
 import { AXIS_PROPS, ChartCard, ChartTooltip, GRID_PROPS, seriesColor } from "@/odoo/charts";
-import { FillBar, formatInt, formatNumber, formatQty } from "@/odoo/format";
+import { formatInt, formatNumber, formatQty } from "@/odoo/format";
 import { EmptyState } from "@/odoo/primitives";
 import { cond } from "@/query/domain";
 import { groupKeyFor } from "@/query/group";
 import { useDerived } from "@/store/appStore";
 import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
+import { RecordsPanel } from "./RecordsPanel";
 import { distinct, useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+import type { Facet } from "@/query/search";
 
 export function InventoryByProductDashboard() {
   return (
@@ -44,18 +47,23 @@ export function InventoryByProductDashboard() {
       modelName="stock"
       description="Everything held for one product: quantities, lots, pallets, locations, age and movement history."
     >
-      {({ scope }) => <ProductBody scope={scope} />}
+      {({ scope, state }) => (
+        <ProductBody scope={scope} carry={state.facets} />
+      )}
     </DashboardFrame>
   );
 }
 
 function ProductBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const derived = useDerived();
   const rows = useScopedRows(scope);
+  const drill = useDrilldown(carry);
   const [productId, setProductId] = useUrlParam("product");
   const [variantId, setVariantId] = useUrlParam("variant");
 
@@ -198,14 +206,14 @@ function ProductBody({
           hint="Where this product is stored."
           height={230}
         >
-          <DistributionChart stock={stock} field="warehouseCode" unit={unit} />
+          <DistributionChart stock={stock} field="warehouseCode" unit={unit} drill={drill} />
         </ChartCard>
         <ChartCard
           title={`Location distribution (${unit})`}
           hint="Aisle-level spread inside the warehouses."
           height={230}
         >
-          <DistributionChart stock={stock} field="aisleCode" unit={unit} limit={12} />
+          <DistributionChart stock={stock} field="aisleCode" unit={unit} limit={12} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -214,16 +222,16 @@ function ProductBody({
           title={`Lot distribution (${unit})`}
           hint="Quantity held by each lot, oldest first."
           height={250}
-          footer="Select a bar to open that lot."
+          footer="Select a bar to open the stock lines for that lot."
         >
-          <LotChart stock={stock} unit={unit} />
+          <LotChart stock={stock} unit={unit} drill={drill} />
         </ChartCard>
         <ChartCard
           title="Stock aging"
           hint="Age measured from the original receipt date."
           height={250}
         >
-          <AgingChart stock={stock} unit={unit} />
+          <AgingChart stock={stock} unit={unit} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -242,6 +250,7 @@ function ProductBody({
 }
 
 function DistributionChart({
+  drill,
   stock,
   field,
   unit,
@@ -251,6 +260,7 @@ function DistributionChart({
   field: "warehouseCode" | "aisleCode";
   unit: string;
   limit?: number;
+  drill: DrilldownFn;
 }) {
   const data = useMemo(() => {
     const totals = new Map<string, number>();
@@ -279,7 +289,27 @@ function DistributionChart({
         <XAxis dataKey="label" {...AXIS_PROPS} />
         <YAxis {...AXIS_PROPS} width={72} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name={`Quantity (${unit})`} radius={[3, 3, 0, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name={`Quantity (${unit})`}
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet(
+                  field === "aisleCode" ? "Aisle" : "Warehouse",
+                  [datum.label],
+                  cond(field, "eq", datum.label),
+                ),
+              ],
+            });
+          }}
+        >
           {data.map((entry, i) => (
             <ReCell key={entry.label} fill={seriesColor(i)} />
           ))}
@@ -289,7 +319,15 @@ function DistributionChart({
   );
 }
 
-function LotChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
+function LotChart({
+  stock,
+  unit,
+  drill,
+}: {
+  stock: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(() => {
     const totals = new Map<string, { label: string; id: string; value: number; inDate: string }>();
     for (const row of stock) {
@@ -327,7 +365,23 @@ function LotChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
         />
         <YAxis {...AXIS_PROPS} width={72} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name={`Quantity (${unit})`} radius={[3, 3, 0, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name={`Quantity (${unit})`}
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet("Lot", [datum.label], cond("lotName", "eq", datum.label)),
+              ],
+            });
+          }}
+        >
           {data.map((entry, i) => (
             <ReCell key={entry.id} fill={seriesColor(i)} />
           ))}
@@ -337,7 +391,15 @@ function LotChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
   );
 }
 
-function AgingChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
+function AgingChart({
+  stock,
+  unit,
+  drill,
+}: {
+  stock: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = AGE_BUCKETS.map((bucket) => {
     const list = stock.filter((r) => r.ageBucket === bucket.id);
     return {
@@ -354,7 +416,28 @@ function AgingChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
         <XAxis dataKey="label" {...AXIS_PROPS} />
         <YAxis {...AXIS_PROPS} width={72} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name={`Quantity (${unit})`} fill="var(--o-series-1)" radius={[3, 3, 0, 0]} />
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name={`Quantity (${unit})`}
+          fill="var(--o-series-1)"
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ key: string; label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet(
+                  "Stock Age",
+                  [datum.label],
+                  cond("ageBucket", "eq", datum.key),
+                ),
+              ],
+            });
+          }}
+        />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -398,56 +481,15 @@ function MovementChart({ movements }: { movements: MovementRow[] }) {
 }
 
 function PalletTable({ stock }: { stock: StockRow[] }) {
-  const shown = useMemo(
-    () => stock.slice().sort((a, b) => a.inDate.localeCompare(b.inDate)).slice(0, 20),
-    [stock],
-  );
-
+  const pallets = new Set(stock.map((row) => row.palletId).filter(Boolean));
   return (
-    <section className="o-card p-3">
-      <h3 className="o-section-heading text-[var(--o-fs-lg)] mb-2">
-        Pallets and positions holding this product (oldest first)
-      </h3>
-      {shown.length === 0 ? (
-        <EmptyState title="No stock for this product in the current filters" />
-      ) : (
-        <table className="o-list">
-          <thead>
-            <tr>
-              <th>Pallet</th>
-              <th>Lot</th>
-              <th>Position</th>
-              <th style={{ textAlign: "right" }}>On hand</th>
-              <th style={{ textAlign: "right" }}>Available</th>
-              <th style={{ width: 140 }}>Pallet fill</th>
-              <th>Received</th>
-              <th style={{ textAlign: "right" }}>Age</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  {row.palletId ? (
-                    <Link to={`/pallets/${row.palletId}`}>{row.palletName}</Link>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>{row.lotId ? <Link to={`/lots/${row.lotId}`}>{row.lotName}</Link> : "-"}</td>
-                <td className="o-truncate">{row.completeName}</td>
-                <td className="num">{formatQty(row.quantity, row.uom)}</td>
-                <td className="num">{formatQty(row.availableQuantity, row.uom)}</td>
-                <td>
-                  <FillBar value={row.fillPct} width={80} />
-                </td>
-                <td>{formatDate(row.inDate)}</td>
-                <td className="num">{formatInt(row.ageDays)} d</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+    <RecordsPanel
+      label="stock lines holding this product"
+      count={stock.length}
+      model="stock"
+      facets={[]}
+      note={`Held on ${pallets.size} distinct pallets. The list shows position, lot, quantity, reservation, fill and age for each one.`}
+    />
   );
 }
+

@@ -53,8 +53,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           title="Ispahani Warehouse Management"
         >
           <AppMark />
-          <span className="font-medium text-[var(--o-fs-base)] whitespace-nowrap">
+          {/* The full name needs ~120px more than the short one. Below 2xl that
+              space is what lets the application menu render in full. */}
+          <span className="font-medium text-[var(--o-fs-base)] whitespace-nowrap hidden 2xl:inline">
             Ispahani Warehouse Management
+          </span>
+          <span className="font-medium text-[var(--o-fs-base)] whitespace-nowrap 2xl:hidden">
+            Ispahani WMS
           </span>
         </Link>
 
@@ -100,9 +105,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </div>
 
-        {/* Below lg the whole application menu collapses into one panel so
+        {/* Below xl the whole application menu collapses into one panel so
             nothing is ever pushed off the bar. */}
-        <div className="lg:hidden">
+        <div className="xl:hidden">
           <Dropdown
             label={<span>Menu</span>}
             buttonClassName="o-navbar-item"
@@ -135,9 +140,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Dropdown>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
+        <div className="ml-auto flex items-center gap-2 whitespace-nowrap shrink-0">
           <span
-            className="hidden xl:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--o-radius-pill)] text-[var(--o-fs-xxs)] text-[var(--o-warning-text)]"
+            className="hidden 2xl:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--o-radius-pill)] text-[var(--o-fs-xxs)] text-[var(--o-warning-text)]"
             style={{ background: "var(--o-tile-amber)" }}
             title="Every figure in this prototype comes from a generated demonstration dataset. It is not Ispahani stock data."
           >
@@ -151,9 +156,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             title="Restore the seeded demonstration data"
           >
             <IconRefresh size={12} />
-            <span className="hidden lg:inline">Reset Demo</span>
+            <span className="hidden xl:inline">Reset Demo</span>
           </button>
-          <span className="hidden md:inline text-[var(--o-fs-sm)] text-[var(--o-navbar-fg)]">
+          <span className="hidden xl:inline text-[var(--o-fs-sm)] text-[var(--o-navbar-fg)]">
             Ispahani Tea Limited
           </span>
           <span

@@ -26,11 +26,12 @@ import { CellPreview } from "@/map/CellPreview";
 import { FloorPlan, occupancyColor } from "@/map/FloorPlan";
 import { ElevationLegend, RackElevation } from "@/map/RackElevation";
 import { AXIS_PROPS, ChartCard, ChartTooltip, GRID_PROPS } from "@/odoo/charts";
-import { formatInt, formatNumber, formatPct, formatQty } from "@/odoo/format";
+import { formatInt, formatNumber, formatPct } from "@/odoo/format";
 import { EmptyState } from "@/odoo/primitives";
 import { cond } from "@/query/domain";
 import { DashboardFrame, KpiRow } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
+import { RecordsPanel } from "./RecordsPanel";
 import { distinct, unitsPresent, useScopedRows } from "./useScoped";
 
 type Level = "site" | "warehouse" | "aisle" | "rack" | "cell";
@@ -523,53 +524,15 @@ function StockTable({
   stock: StockRow[];
   facets: Parameters<typeof listUrl>[1];
 }) {
-  const shown = stock.slice(0, 20);
   return (
-    <section className="o-card p-3">
-      <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h3 className="text-[var(--o-fs-sm)] font-medium text-[var(--o-gray-700)] m-0">
-          Stock at this location
-        </h3>
-        <Link className="o-btn o-btn-secondary o-btn-sm" to={listUrl("stock", facets)}>
-          Open all {formatInt(stock.length)} stock lines
-        </Link>
-      </div>
-      {shown.length === 0 ? (
-        <EmptyState title="No stock lines here" />
-      ) : (
-        <table className="o-list">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Lot</th>
-              <th>Pallet</th>
-              <th>Position</th>
-              <th style={{ textAlign: "right" }}>On hand</th>
-              <th style={{ textAlign: "right" }}>Available</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <Link to={`/products/${row.productId}`}>{row.productName}</Link>
-                </td>
-                <td>{row.lotId ? <Link to={`/lots/${row.lotId}`}>{row.lotName}</Link> : "-"}</td>
-                <td>
-                  {row.palletId ? (
-                    <Link to={`/pallets/${row.palletId}`}>{row.palletName}</Link>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="o-truncate">{row.completeName}</td>
-                <td className="num">{formatQty(row.quantity, row.uom)}</td>
-                <td className="num">{formatQty(row.availableQuantity, row.uom)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+    <RecordsPanel
+      label="stock lines at this location"
+      count={stock.length}
+      model="stock"
+      facets={facets}
+      extra={[{ label: "Pallets here", model: "pallet", facets }]}
+      note="Stock lines carry product, variant, lot, pallet, quantity, reservation and age, and can be grouped to any level of the hierarchy."
+    />
   );
 }
+

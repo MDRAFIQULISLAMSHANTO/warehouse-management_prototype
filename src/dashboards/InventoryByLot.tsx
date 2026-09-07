@@ -20,21 +20,22 @@ import {
   YAxis,
 } from "recharts";
 import { contextFacet, listUrl } from "@/app/links";
-import { formatDate, formatDateTime } from "@/data/clock";
-import type { MovementRow, StockRow } from "@/data/derive";
+import { formatDate } from "@/data/clock";
+import type { StockRow } from "@/data/derive";
 import { useUrlParam } from "@/hooks/useSearchState";
-import { CellPreview } from "@/map/CellPreview";
 import { FloorPlan } from "@/map/FloorPlan";
 import { SearchableSelect } from "@/odoo/CustomFilter";
 import { AXIS_PROPS, ChartCard, ChartTooltip, GRID_PROPS, seriesColor } from "@/odoo/charts";
-import { FillBar, formatInt, formatNumber, formatQty } from "@/odoo/format";
+import { formatInt, formatNumber } from "@/odoo/format";
 import { Badge, EmptyState } from "@/odoo/primitives";
-import { StateBadge } from "@/odoo/format";
 import { cond } from "@/query/domain";
 import { useDerived } from "@/store/appStore";
 import { DashboardFrame, KpiRow, PanelGrid } from "./DashboardFrame";
 import { Kpi } from "./Kpi";
+import { RecordsPanel } from "./RecordsPanel";
 import { useScopedRows } from "./useScoped";
+import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrilldown";
+import type { Facet } from "@/query/search";
 
 export function InventoryByLotDashboard() {
   return (
@@ -43,18 +44,21 @@ export function InventoryByLotDashboard() {
       modelName="lot"
       description="Full traceability for one lot: receipt, age, quantities, the pallets and positions holding it, and its movement history."
     >
-      {({ scope }) => <LotBody scope={scope} />}
+      {({ scope, state }) => <LotBody scope={scope} carry={state.facets} />}
     </DashboardFrame>
   );
 }
 
 function LotBody({
   scope,
+  carry,
 }: {
   scope: ReturnType<typeof import("./scope").buildScope>;
+  carry: Facet[];
 }) {
   const derived = useDerived();
   const rows = useScopedRows(scope);
+  const drill = useDrilldown(carry);
   const [lotId, setLotId] = useUrlParam("lot");
 
   const lots = derived.lots;
@@ -73,8 +77,7 @@ function LotBody({
     [derived.movements, activeLotId],
   );
 
-  const [cellId, setCellId] = useUrlParam("cell");
-  const selectedCell = derived.cells.find((c) => c.id === cellId);
+  const [, setCellId] = useUrlParam("cell");
 
   const lotCells = useMemo(() => {
     const ids = new Set(stock.map((r) => r.locationId));
@@ -194,14 +197,14 @@ function LotBody({
           hint="How this lot is split between pallets."
           height={240}
         >
-          <PalletChart stock={stock} unit={lot.uom} />
+          <PalletChart stock={stock} unit={lot.uom} drill={drill} />
         </ChartCard>
         <ChartCard
           title={`Distribution across locations (${lot.uom})`}
           hint="Which positions hold it."
           height={240}
         >
-          <LocationChart stock={stock} unit={lot.uom} />
+          <LocationChart stock={stock} unit={lot.uom} drill={drill} />
         </ChartCard>
       </PanelGrid>
 
@@ -226,127 +229,33 @@ function LotBody({
           </section>
         )}
 
-        <section className="o-card p-3">
-          <h3 className="o-section-heading text-[var(--o-fs-lg)] mb-2">
-            Pallets and positions
-          </h3>
-          {stock.length === 0 ? (
-            <EmptyState
-              title="This lot holds no stock"
-              hint="It has been fully consumed. Its movement history below still shows what happened to it."
-            />
-          ) : (
-            <div className="grid gap-3 grid-cols-1 2xl:grid-cols-[1fr_320px]">
-              <table className="o-list">
-              <thead>
-                <tr>
-                  <th>Pallet</th>
-                  <th>Position</th>
-                  <th style={{ textAlign: "right" }}>On hand</th>
-                  <th style={{ textAlign: "right" }}>Reserved</th>
-                  <th style={{ textAlign: "right" }}>Available</th>
-                  <th style={{ width: 130 }}>Fill</th>
-                  <th style={{ width: 90 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {stock.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      {row.palletId ? (
-                        <Link to={`/pallets/${row.palletId}`}>{row.palletName}</Link>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="o-truncate">{row.completeName}</td>
-                    <td className="num">{formatQty(row.quantity, row.uom)}</td>
-                    <td className="num">{formatQty(row.reservedQuantity, row.uom)}</td>
-                    <td className="num">{formatQty(row.availableQuantity, row.uom)}</td>
-                    <td>
-                      <FillBar value={row.fillPct} width={70} />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="o-btn o-btn-secondary o-btn-sm"
-                        onClick={() => setCellId(row.locationId)}
-                      >
-                        Inspect
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-              {selectedCell && (
-                <CellPreview cell={selectedCell} onClose={() => setCellId(null)} />
-              )}
-            </div>
-          )}
-        </section>
+        <RecordsPanel
+          label={`pallets and positions holding ${lot.name}`}
+          count={stock.length}
+          model="stock"
+          facets={[contextFacet("Lot", [lot.name], cond("lotId", "eq", lot.id))]}
+          extra={[
+            {
+              label: "Pallets",
+              model: "pallet",
+              facets: [contextFacet("Lot", [lot.name], cond("lotId", "eq", lot.id))],
+            },
+          ]}
+          note="Select a bar above, or a rack on the map, to open a narrower set. The lot record carries the same detail with its full history."
+        />
       </div>
 
-      <section className="o-card p-3">
-        <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-          <h3 className="text-[var(--o-fs-sm)] font-medium text-[var(--o-gray-700)] m-0">
-            Movement history
-          </h3>
-          <Link
-            className="o-btn o-btn-secondary o-btn-sm"
-            to={listUrl("movement", [
-              contextFacet("Lot", [lot.name], cond("lotId", "eq", lot.id)),
-            ])}
-          >
-            Open all {formatInt(movements.length)} movements
-          </Link>
-        </div>
-        {movements.length === 0 ? (
-          <EmptyState
-            title="No recorded movements"
-            hint="This lot arrived as part of the opening balance loaded before the demonstration window."
-          />
-        ) : (
-          <table className="o-list">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Reference</th>
-                <th>Type</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Pallet</th>
-                <th style={{ textAlign: "right" }}>Quantity</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {movements.slice(0, 25).map((row: MovementRow) => (
-                <tr key={row.id}>
-                  <td>{formatDateTime(row.movementDate)}</td>
-                  <td>
-                    <Link to={`/operations/${row.operationId}`}>{row.operationName}</Link>
-                  </td>
-                  <td>{row.kind}</td>
-                  <td className="o-truncate">{row.sourceLocationName}</td>
-                  <td className="o-truncate">{row.destLocationName}</td>
-                  <td>
-                    {row.palletId ? (
-                      <Link to={`/pallets/${row.palletId}`}>{row.palletName}</Link>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="num">{formatQty(row.doneQty || row.quantity, row.uom)}</td>
-                  <td>
-                    <StateBadge value={row.state} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <RecordsPanel
+        label={`recorded movements of ${lot.name}`}
+        count={movements.length}
+        model="movement"
+        facets={[contextFacet("Lot", [lot.name], cond("lotId", "eq", lot.id))]}
+        note={
+          movements.length === 0
+            ? "None recorded: this lot arrived as part of the opening balance loaded before the demonstration window."
+            : "Every validated movement, with the source and destination position and the pallet involved."
+        }
+      />
     </>
   );
 }
@@ -362,7 +271,15 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function PalletChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
+function PalletChart({
+  stock,
+  unit,
+  drill,
+}: {
+  stock: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(
     () =>
       stock
@@ -386,7 +303,23 @@ function PalletChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
         <XAxis type="number" {...AXIS_PROPS} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <YAxis type="category" dataKey="label" {...AXIS_PROPS} width={110} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name={`Quantity (${unit})`} radius={[0, 3, 3, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name={`Quantity (${unit})`}
+          radius={[0, 3, 3, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "pallet",
+              facets: [
+                contextFacet("Pallet", [datum.label], cond("name", "eq", datum.label)),
+              ],
+            });
+          }}
+        >
           {data.map((entry, i) => (
             <ReCell key={entry.id} fill={seriesColor(i)} />
           ))}
@@ -396,7 +329,15 @@ function PalletChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
   );
 }
 
-function LocationChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
+function LocationChart({
+  stock,
+  unit,
+  drill,
+}: {
+  stock: StockRow[];
+  unit: string;
+  drill: DrilldownFn;
+}) {
   const data = useMemo(() => {
     const totals = new Map<string, number>();
     for (const row of stock) {
@@ -418,7 +359,23 @@ function LocationChart({ stock, unit }: { stock: StockRow[]; unit: string }) {
         <XAxis dataKey="label" {...AXIS_PROPS} angle={-30} textAnchor="end" height={54} interval={0} />
         <YAxis {...AXIS_PROPS} width={72} tickFormatter={(v: number) => formatNumber(v, 0)} />
         <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: "var(--o-hover-bg)" }} />
-        <Bar maxBarSize={64} dataKey="value" name={`Quantity (${unit})`} radius={[3, 3, 0, 0]}>
+        <Bar
+          maxBarSize={64}
+          dataKey="value"
+          name={`Quantity (${unit})`}
+          radius={[3, 3, 0, 0]}
+          style={CLICKABLE}
+          onClick={(arg: unknown) => {
+            const datum = payloadOf<{ label: string }>(arg);
+            if (!datum) return;
+            drill({
+              model: "stock",
+              facets: [
+                contextFacet("Rack", [datum.label], cond("rackCode", "eq", datum.label)),
+              ],
+            });
+          }}
+        >
           {data.map((entry, i) => (
             <ReCell key={entry.label} fill={seriesColor(i)} />
           ))}
