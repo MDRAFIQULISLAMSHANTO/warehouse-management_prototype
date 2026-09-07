@@ -1,0 +1,191 @@
+/*
+ * Design tokens — transcribed from the Odoo 19 source installed locally at
+ * C:\Program Files\Odoo 19.0.20260401\server\odoo\addons\web\static\src\scss
+ * (primary_variables.scss, pre_variables.scss, secondary_variables.scss).
+ *
+ * Enterprise anchors, per https://www.odoo.com/page/brand-assets :
+ *   $o-enterprise-color        #714B67   (brand mark)
+ *   $o-enterprise-action-color #017e84   (action / links / active)
+ *
+ * INTERFACE GENERATION: this theme targets the CURRENT Odoo backend, which
+ * moved away from the solid plum navbar of Odoo 16-18. In the current release
+ * the chrome is white, navbar text is dark, teal (#017E84) carries actions,
+ * selected navigation and section headings, and KPI tiles sit on soft pastel
+ * washes. Purple is retained as the application identity mark only.
+ *
+ * Everything below is a token. No component may hard-code a hex value.
+ */
+
+:root {
+  /* ---- brand ------------------------------------------------------------ */
+  --o-brand-primary: #714b67;
+  --o-brand-primary-dark: #5b3c53;
+  --o-brand-primary-darker: #452d3f;
+  --o-brand-primary-tint: #f3eef2;
+  --o-brand-primary-tint-strong: #e3d6de;
+
+  --o-action: #017e84;
+  --o-action-dark: #016066;
+  --o-action-darker: #014a4f;
+  --o-action-tint: #e6f2f3;
+  --o-action-tint-strong: #c7e0e2; /* mix($o-action, $o-gray-100, 20%) */
+
+  /* ---- grays (Bootstrap 5 scale, as shipped by Odoo) -------------------- */
+  --o-white: #ffffff;
+  --o-gray-100: #f8f9fa;
+  --o-gray-200: #e9ecef;
+  --o-gray-300: #dee2e6;
+  --o-gray-400: #ced4da;
+  --o-gray-500: #adb5bd;
+  --o-gray-600: #6c757d;
+  --o-gray-700: #495057;
+  --o-gray-800: #343a40;
+  --o-gray-900: #212529;
+  --o-black: #000000;
+
+  /* ---- surfaces --------------------------------------------------------- */
+  --o-webclient-bg: var(--o-gray-100); /* $o-webclient-background-color */
+  --o-view-bg: var(--o-white); /* $o-view-background-color */
+  --o-surface-sunken: #f1f3f5;
+  --o-surface-raised: var(--o-white);
+  --o-surface-hover: #f6f7f9;
+  --o-surface-selected: var(--o-action-tint);
+  --o-navbar-bg: var(--o-white);
+  --o-navbar-fg: #1f2429;
+  --o-navbar-fg-muted: #6c757d;
+  --o-navbar-hover-bg: #f0f2f4;
+  --o-navbar-border: #e5e8eb;
+  /* The app-drawer wash behind the application tiles. */
+  --o-drawer-bg: linear-gradient(135deg, #e9e7f2 0%, #eceaf3 45%, #e4e6ef 100%);
+
+  /* ---- text ------------------------------------------------------------- */
+  --o-text: var(--o-gray-900); /* $o-main-text-color */
+  --o-text-muted: rgba(73, 80, 87, 0.76); /* $o-main-color-muted */
+  --o-text-subtle: var(--o-gray-600);
+  --o-text-heading: var(--o-black);
+  /* Section headings above charts and panels are teal in the current UI. */
+  --o-text-section: #0f7178;
+  --o-text-link: #017e84;
+  --o-text-on-brand: var(--o-white);
+
+  /* ---- borders ---------------------------------------------------------- */
+  --o-border: var(--o-gray-300);
+  --o-border-strong: var(--o-gray-400);
+  --o-border-subtle: var(--o-gray-200);
+  --o-border-focus: var(--o-action);
+
+  /* ---- interaction states ----------------------------------------------- */
+  --o-hover-bg: var(--o-surface-hover);
+  --o-selected-bg: var(--o-action-tint);
+  --o-selected-border: var(--o-action);
+  --o-focus-ring: 0 0 0 1px var(--o-action);
+  --o-focus-ring-soft: 0 0 0 3px rgba(1, 126, 132, 0.18);
+  --o-disabled-opacity: 0.5; /* $o-opacity-disabled */
+  --o-muted-opacity: 0.76; /* $o-opacity-muted */
+
+  /* ---- semantic states (Odoo values) ------------------------------------ */
+  --o-success: #28a745;
+  --o-info: #17a2b8;
+  --o-warning: #ffac00;
+  --o-danger: #dc3545;
+  --o-success-text: #008818;
+  --o-info-text: #0180a5;
+  --o-warning-text: #9a6b01;
+  --o-danger-text: #d23f3a;
+  --o-success-bg: #e7f6ea;
+  --o-info-bg: #e4f4f8;
+  --o-warning-bg: #fff4e0;
+  --o-danger-bg: #fbe9ea;
+  --o-favorite: #f3cc00; /* $o-main-favorite-color */
+
+  /* ---- KPI tile washes (current Odoo dashboard tiles) ------------------- */
+  --o-tile-blue: #eaf1fb;
+  --o-tile-blue-line: #d3e2f6;
+  --o-tile-green: #e8f5ec;
+  --o-tile-green-line: #cfe9d8;
+  --o-tile-amber: #fdf2e5;
+  --o-tile-amber-line: #f7e2c8;
+  --o-tile-red: #fdecec;
+  --o-tile-red-line: #f8d7d7;
+  --o-tile-teal: #e4f2f2;
+  --o-tile-teal-line: #c8e4e5;
+  --o-tile-plum: #f3eef2;
+  --o-tile-plum-line: #e4d8e1;
+  --o-tile-neutral: #f4f6f8;
+  --o-tile-neutral-line: #e4e8ec;
+
+  /* ---- occupancy / status scale (prototype extension, documented) ------- */
+  --o-occ-empty: #dfe3e7;
+  --o-occ-low: #7fc8a9;
+  --o-occ-medium: #f0b429;
+  --o-occ-high: #e8833a;
+  --o-occ-full: #c0392b;
+  --o-occ-blocked: #6c757d;
+  --o-occ-reserved: #5b8def;
+  --o-occ-partial: #f0b429;
+
+  /* categorical series for charts — brand-led, colour-blind tolerant */
+  --o-series-1: #714b67;
+  --o-series-2: #017e84;
+  --o-series-3: #d98c3f;
+  --o-series-4: #5b8def;
+  --o-series-5: #8a9a5b;
+  --o-series-6: #b0576c;
+  --o-series-7: #4c8c99;
+  --o-series-8: #9a6b01;
+
+  /* ---- typography ------------------------------------------------------- */
+  --o-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Ubuntu, "Noto Sans", Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --o-font-mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+
+  --o-fs-base: 14px; /* $o-font-size-base */
+  --o-fs-sm: 13px; /* $o-font-size-base-small */
+  --o-fs-xs: 12px; /* $o-font-size-base-smaller */
+  --o-fs-xxs: 11px;
+  --o-fs-lg: 16px;
+  --o-fs-xl: 20px;
+  --o-fs-2xl: 26px;
+  --o-fs-3xl: 32px;
+
+  --o-lh-tight: 1.25; /* $o-line-height-sm */
+  --o-lh-base: 1.5; /* $o-line-height-base */
+
+  --o-fw-normal: 400;
+  --o-fw-medium: 500;
+  --o-fw-bold: 700;
+
+  /* ---- spacing (multiples of $o-spacer: 16px) --------------------------- */
+  --o-sp-1: 4px;
+  --o-sp-2: 8px;
+  --o-sp-3: 12px;
+  --o-sp-4: 16px;
+  --o-sp-5: 20px;
+  --o-sp-6: 24px;
+  --o-sp-8: 32px;
+  --o-sp-10: 40px;
+
+  /* ---- radius ----------------------------------------------------------- */
+  --o-radius-sm: 3px;
+  --o-radius: 4px;
+  --o-radius-md: 6px;
+  --o-radius-lg: 8px;
+  --o-radius-pill: 999px;
+
+  /* ---- elevation -------------------------------------------------------- */
+  --o-shadow-xs: 0 1px 2px rgba(48, 48, 48, 0.08);
+  --o-shadow-sm: 0 1px 3px rgba(48, 48, 48, 0.12);
+  --o-shadow: 0 2px 6px rgba(48, 48, 48, 0.14);
+  --o-shadow-lg: 0 6px 18px rgba(48, 48, 48, 0.18);
+  --o-shadow-popover: 0 4px 14px rgba(48, 48, 48, 0.22);
+
+  /* ---- layout metrics --------------------------------------------------- */
+  --o-navbar-h: 46px;
+  --o-control-panel-h: 46px;
+  --o-row-h: 30px;
+  --o-z-popover: 1000;
+  --o-z-modal: 1050;
+  --o-z-toast: 1100;
+}

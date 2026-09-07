@@ -1,0 +1,665 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+/* Map the Odoo tokens into Tailwind's theme so utilities stay on-token. */
+@theme inline {
+  --color-brand: var(--o-brand-primary);
+  --color-brand-dark: var(--o-brand-primary-dark);
+  --color-brand-tint: var(--o-brand-primary-tint);
+  --color-action: var(--o-action);
+  --color-action-dark: var(--o-action-dark);
+  --color-action-tint: var(--o-action-tint);
+
+  --color-view: var(--o-view-bg);
+  --color-webclient: var(--o-webclient-bg);
+  --color-sunken: var(--o-surface-sunken);
+  --color-hover: var(--o-surface-hover);
+
+  --color-ink: var(--o-text);
+  --color-muted: var(--o-text-muted);
+  --color-subtle: var(--o-text-subtle);
+
+  --color-line: var(--o-border);
+  --color-line-strong: var(--o-border-strong);
+  --color-line-subtle: var(--o-border-subtle);
+
+  --color-ok: var(--o-success);
+  --color-warn: var(--o-warning);
+  --color-bad: var(--o-danger);
+  --color-info: var(--o-info);
+  --color-ok-text: var(--o-success-text);
+  --color-warn-text: var(--o-warning-text);
+  --color-bad-text: var(--o-danger-text);
+  --color-info-text: var(--o-info-text);
+
+  --font-sans: var(--o-font-sans);
+  --font-mono: var(--o-font-mono);
+
+  --radius-o: var(--o-radius);
+  --radius-o-md: var(--o-radius-md);
+  --radius-o-lg: var(--o-radius-lg);
+
+  --shadow-o-xs: var(--o-shadow-xs);
+  --shadow-o-sm: var(--o-shadow-sm);
+  --shadow-o: var(--o-shadow);
+  --shadow-o-lg: var(--o-shadow-lg);
+  --shadow-o-pop: var(--o-shadow-popover);
+}
+
+/* ------------------------------------------------------------------ base */
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--o-webclient-bg);
+  color: var(--o-text);
+  font-family: var(--o-font-sans);
+  font-size: var(--o-fs-base);
+  line-height: var(--o-lh-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--o-text-link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--o-focus-ring-soft);
+  border-radius: var(--o-radius-sm);
+}
+
+/* Odoo's backend scrollbars are thin and unobtrusive. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--o-gray-400) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--o-gray-400);
+  border-radius: var(--o-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--o-gray-500);
+  background-clip: content-box;
+}
+
+/* ------------------------------------------------------- odoo components */
+
+/* Buttons -------------------------------------------------------------- */
+.o-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--o-sp-2);
+  height: 28px;
+  padding: 0 var(--o-sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--o-radius);
+  font-size: var(--o-fs-sm);
+  font-weight: var(--o-fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease,
+    color 0.12s ease;
+}
+.o-btn:disabled,
+.o-btn[aria-disabled="true"] {
+  opacity: var(--o-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.o-btn-primary {
+  background: var(--o-action);
+  border-color: var(--o-action);
+  color: var(--o-text-on-brand);
+}
+.o-btn-primary:hover:not(:disabled) {
+  background: var(--o-action-dark);
+  border-color: var(--o-action-darker);
+}
+
+/* Retained for identity moments that should still read as Odoo plum. */
+.o-btn-brand {
+  background: var(--o-brand-primary);
+  border-color: var(--o-brand-primary);
+  color: var(--o-text-on-brand);
+}
+.o-btn-brand:hover:not(:disabled) {
+  background: var(--o-brand-primary-dark);
+}
+
+.o-btn-action {
+  background: var(--o-action);
+  border-color: var(--o-action);
+  color: var(--o-text-on-brand);
+}
+.o-btn-action:hover:not(:disabled) {
+  background: var(--o-action-dark);
+}
+
+.o-btn-secondary {
+  background: var(--o-white);
+  border-color: var(--o-border-strong);
+  color: var(--o-text);
+}
+.o-btn-secondary:hover:not(:disabled) {
+  background: var(--o-gray-100);
+  border-color: var(--o-gray-500);
+}
+
+.o-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--o-text);
+}
+.o-btn-ghost:hover:not(:disabled) {
+  background: var(--o-hover-bg);
+}
+
+.o-btn-link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--o-text-link);
+  padding: 0 var(--o-sp-1);
+  height: auto;
+}
+.o-btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.o-btn-sm {
+  height: 24px;
+  padding: 0 var(--o-sp-2);
+  font-size: var(--o-fs-xs);
+}
+
+/* Inputs ---------------------------------------------------------------- */
+.o-input {
+  height: 28px;
+  padding: 0 var(--o-sp-2);
+  border: 1px solid var(--o-border-strong);
+  border-radius: var(--o-radius);
+  background: var(--o-white);
+  font-size: var(--o-fs-sm);
+  color: var(--o-text);
+  width: 100%;
+}
+.o-input:focus {
+  outline: none;
+  border-color: var(--o-brand-primary);
+  box-shadow: var(--o-focus-ring-soft);
+}
+.o-input:disabled {
+  background: var(--o-gray-100);
+  opacity: var(--o-disabled-opacity);
+}
+select.o-input {
+  padding-right: var(--o-sp-1);
+  cursor: pointer;
+}
+
+/* Cards / sheets -------------------------------------------------------- */
+.o-card {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border);
+  border-radius: var(--o-radius-md);
+  box-shadow: var(--o-shadow-xs);
+}
+
+.o-sheet {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border);
+  border-radius: var(--o-radius-md);
+  box-shadow: var(--o-shadow-sm);
+}
+
+/* Popovers / dropdowns -------------------------------------------------- */
+.o-popover {
+  background: var(--o-white);
+  border: 1px solid var(--o-border);
+  border-radius: var(--o-radius-md);
+  box-shadow: var(--o-shadow-popover);
+  z-index: var(--o-z-popover);
+}
+
+.o-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--o-sp-2);
+  width: 100%;
+  padding: var(--o-sp-1) var(--o-sp-3);
+  font-size: var(--o-fs-sm);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  min-height: 26px;
+}
+.o-menu-item:hover {
+  background: var(--o-hover-bg);
+}
+.o-menu-item[data-selected="true"] {
+  background: var(--o-selected-bg);
+  font-weight: var(--o-fw-medium);
+}
+
+.o-menu-title {
+  padding: var(--o-sp-2) var(--o-sp-3) var(--o-sp-1);
+  font-size: var(--o-fs-xxs);
+  font-weight: var(--o-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--o-text-subtle);
+}
+
+.o-menu-sep {
+  height: 1px;
+  background: var(--o-border-subtle);
+  margin: var(--o-sp-1) 0;
+}
+
+/* Search facets --------------------------------------------------------- */
+.o-facet {
+  display: inline-flex;
+  align-items: stretch;
+  height: 22px;
+  border: 1px solid var(--o-action);
+  border-radius: var(--o-radius);
+  overflow: hidden;
+  font-size: var(--o-fs-xs);
+  max-width: 340px;
+}
+.o-facet-label {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--o-sp-2);
+  background: var(--o-action);
+  color: var(--o-text-on-brand);
+  font-weight: var(--o-fw-medium);
+  white-space: nowrap;
+}
+.o-facet-values {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--o-sp-2);
+  background: var(--o-white);
+  color: var(--o-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.o-facet-remove {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--o-sp-1) 0 0;
+  background: var(--o-white);
+  border: 0;
+  color: var(--o-text-subtle);
+  cursor: pointer;
+}
+.o-facet-remove:hover {
+  color: var(--o-danger);
+}
+
+/* Lists ----------------------------------------------------------------- */
+.o-list {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--o-fs-sm);
+}
+.o-list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--o-gray-100);
+  border-bottom: 1px solid var(--o-border);
+  padding: var(--o-sp-2) var(--o-sp-2);
+  text-align: left;
+  font-weight: var(--o-fw-medium);
+  font-size: var(--o-fs-xs);
+  color: var(--o-gray-700);
+  white-space: nowrap;
+  user-select: none;
+}
+.o-list tbody td {
+  border-bottom: 1px solid var(--o-border-subtle);
+  padding: var(--o-sp-1) var(--o-sp-2);
+  height: var(--o-row-h);
+  vertical-align: middle;
+}
+.o-list tbody tr:hover td {
+  background: var(--o-hover-bg);
+}
+.o-list tbody tr[data-selected="true"] td {
+  background: var(--o-selected-bg);
+}
+.o-list tfoot td {
+  border-top: 1px solid var(--o-border);
+  font-weight: var(--o-fw-bold);
+  padding: var(--o-sp-2);
+  background: var(--o-white);
+  position: sticky;
+  bottom: 0;
+}
+.o-list .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status bar ------------------------------------------------------------ */
+.o-statusbar {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--o-border-strong);
+  border-radius: var(--o-radius);
+  overflow: hidden;
+  background: var(--o-white);
+}
+.o-status-step {
+  padding: var(--o-sp-1) var(--o-sp-3);
+  font-size: var(--o-fs-xs);
+  font-weight: var(--o-fw-medium);
+  color: var(--o-text-subtle);
+  border-right: 1px solid var(--o-border);
+  background: var(--o-white);
+  white-space: nowrap;
+}
+.o-status-step:last-child {
+  border-right: 0;
+}
+.o-status-step[data-active="true"] {
+  background: var(--o-action);
+  color: var(--o-text-on-brand);
+}
+.o-status-step[data-done="true"] {
+  color: var(--o-text);
+}
+
+/* Smart buttons --------------------------------------------------------- */
+.o-smart-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 104px;
+  padding: var(--o-sp-1) var(--o-sp-3);
+  border: 1px solid var(--o-border-strong);
+  border-radius: var(--o-radius);
+  background: var(--o-white);
+  cursor: pointer;
+  text-align: left;
+}
+.o-smart-btn:hover {
+  background: var(--o-gray-100);
+  border-color: var(--o-gray-500);
+}
+.o-smart-btn .val {
+  font-size: var(--o-fs-lg);
+  font-weight: var(--o-fw-bold);
+  line-height: 1.1;
+  color: var(--o-text);
+}
+.o-smart-btn .lbl {
+  font-size: var(--o-fs-xxs);
+  color: var(--o-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Badges ---------------------------------------------------------------- */
+.o-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--o-sp-1);
+  padding: 1px var(--o-sp-2);
+  border-radius: var(--o-radius-pill);
+  font-size: var(--o-fs-xxs);
+  font-weight: var(--o-fw-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.o-badge.tone-ok {
+  background: var(--o-success-bg);
+  color: var(--o-success-text);
+}
+.o-badge.tone-warn {
+  background: var(--o-warning-bg);
+  color: var(--o-warning-text);
+}
+.o-badge.tone-bad {
+  background: var(--o-danger-bg);
+  color: var(--o-danger-text);
+}
+.o-badge.tone-info {
+  background: var(--o-info-bg);
+  color: var(--o-info-text);
+}
+.o-badge.tone-neutral {
+  background: var(--o-gray-200);
+  color: var(--o-gray-700);
+}
+.o-badge.tone-brand {
+  background: var(--o-brand-primary-tint);
+  color: var(--o-brand-primary);
+}
+
+.o-badge.state-draft {
+  background: var(--o-gray-200);
+  color: var(--o-gray-700);
+}
+.o-badge.state-waiting {
+  background: var(--o-warning-bg);
+  color: var(--o-warning-text);
+}
+.o-badge.state-ready {
+  background: var(--o-info-bg);
+  color: var(--o-info-text);
+}
+.o-badge.state-done {
+  background: var(--o-success-bg);
+  color: var(--o-success-text);
+}
+.o-badge.state-cancel {
+  background: var(--o-danger-bg);
+  color: var(--o-danger-text);
+}
+
+/* Tabs ------------------------------------------------------------------ */
+.o-tab {
+  padding: var(--o-sp-2) var(--o-sp-3);
+  font-size: var(--o-fs-sm);
+  font-weight: var(--o-fw-medium);
+  color: var(--o-text-subtle);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  background: transparent;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  white-space: nowrap;
+}
+.o-tab:hover {
+  color: var(--o-text);
+}
+.o-tab[aria-selected="true"] {
+  color: var(--o-action);
+  border-bottom-color: var(--o-action);
+}
+
+/* Map ------------------------------------------------------------------- */
+.o-map-cell {
+  cursor: pointer;
+  transition: stroke 0.08s ease, stroke-width 0.08s ease;
+}
+.o-map-cell:hover {
+  stroke: var(--o-action);
+  stroke-width: 1.6;
+}
+.o-map-rack {
+  cursor: pointer;
+}
+.o-map-rack:hover .o-map-rack-body {
+  stroke: var(--o-action);
+  stroke-width: 1.4;
+}
+
+/* Utility --------------------------------------------------------------- */
+.o-tabular {
+  font-variant-numeric: tabular-nums;
+}
+.o-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media print {
+  .o-no-print {
+    display: none !important;
+  }
+}
+
+/* --------------------------------------------------- current-UI chrome */
+
+/* The white application bar of the current Odoo backend.
+   Sticky, so the application menu is always reachable and a menu can never be
+   opened against a navbar that has scrolled out of view. */
+.o-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background: var(--o-navbar-bg);
+  color: var(--o-navbar-fg);
+  border-bottom: 1px solid var(--o-navbar-border);
+  height: var(--o-navbar-h);
+  flex: 0 0 auto;
+}
+
+.o-navbar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--o-sp-1);
+  height: 30px;
+  padding: 0 var(--o-sp-2);
+  border: 0;
+  border-radius: var(--o-radius);
+  background: transparent;
+  color: var(--o-navbar-fg);
+  font-size: var(--o-fs-sm);
+  font-weight: var(--o-fw-normal);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.o-navbar-item:hover {
+  background: var(--o-navbar-hover-bg);
+}
+.o-navbar-item[data-active="true"] {
+  background: var(--o-action-tint);
+  color: var(--o-action-dark);
+  font-weight: var(--o-fw-medium);
+}
+
+/* Section headings above charts and panels: teal, as in the current UI. */
+.o-section-heading {
+  color: var(--o-text-section);
+  font-size: var(--o-fs-xl);
+  font-weight: var(--o-fw-bold);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* Pastel KPI tiles. */
+.o-tile {
+  border-radius: var(--o-radius-lg);
+  border: 1px solid transparent;
+  padding: var(--o-sp-3) var(--o-sp-4);
+}
+.o-tile.tone-neutral {
+  background: var(--o-tile-neutral);
+  border-color: var(--o-tile-neutral-line);
+}
+.o-tile.tone-brand {
+  background: var(--o-tile-plum);
+  border-color: var(--o-tile-plum-line);
+}
+.o-tile.tone-action {
+  background: var(--o-tile-teal);
+  border-color: var(--o-tile-teal-line);
+}
+.o-tile.tone-info {
+  background: var(--o-tile-blue);
+  border-color: var(--o-tile-blue-line);
+}
+.o-tile.tone-ok {
+  background: var(--o-tile-green);
+  border-color: var(--o-tile-green-line);
+}
+.o-tile.tone-warn {
+  background: var(--o-tile-amber);
+  border-color: var(--o-tile-amber-line);
+}
+.o-tile.tone-bad {
+  background: var(--o-tile-red);
+  border-color: var(--o-tile-red-line);
+}
+
+/* Sidebar-style navigation lists (the grouped menu of the current UI). */
+.o-sidenav-group {
+  padding: var(--o-sp-3) var(--o-sp-3) var(--o-sp-1);
+  font-size: var(--o-fs-xxs);
+  font-weight: var(--o-fw-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--o-text-subtle);
+}
+.o-sidenav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--o-sp-1) var(--o-sp-3);
+  border: 0;
+  border-radius: var(--o-radius);
+  background: transparent;
+  color: var(--o-text);
+  font-size: var(--o-fs-sm);
+  cursor: pointer;
+  text-decoration: none;
+}
+.o-sidenav-item:hover {
+  background: var(--o-hover-bg);
+  text-decoration: none;
+}
+.o-sidenav-item[data-active="true"] {
+  background: var(--o-action-tint);
+  color: var(--o-action-dark);
+  font-weight: var(--o-fw-medium);
+}
