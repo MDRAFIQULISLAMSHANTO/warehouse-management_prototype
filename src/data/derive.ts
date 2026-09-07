@@ -198,6 +198,11 @@ export interface CellRow extends RowBase {
   name: string;
   completeName: string;
   warehouseId: string;
+  /** Section of the building: Raw Material, or Packed Tea / FG. */
+  sectionId: string;
+  sectionCode: string;
+  sectionName: string;
+  sectionStage: string;
   warehouseCode: string;
   warehouseName: string;
   materialGroup: MaterialGroup;
@@ -253,6 +258,11 @@ export interface PalletRow extends RowBase {
   locationName?: string;
   completeName?: string;
   warehouseId?: string;
+  /** Section of the building: Raw Material, or Packed Tea / FG. */
+  sectionId: string;
+  sectionCode: string;
+  sectionName: string;
+  sectionStage: string;
   warehouseCode?: string;
   warehouseName?: string;
   materialGroup?: MaterialGroup;
@@ -304,6 +314,11 @@ export interface StockRow extends RowBase {
   completeName: string;
   locationKind: Location["kind"];
   warehouseId?: string;
+  /** Section of the building: Raw Material, or Packed Tea / FG. */
+  sectionId: string;
+  sectionCode: string;
+  sectionName: string;
+  sectionStage: string;
   warehouseCode?: string;
   warehouseName?: string;
   aisleId?: string;
@@ -444,6 +459,11 @@ export interface RackRow extends RowBase {
   code: string;
   name: string;
   warehouseId: string;
+  /** Section of the building: Raw Material, or Packed Tea / FG. */
+  sectionId: string;
+  sectionCode: string;
+  sectionName: string;
+  sectionStage: string;
   warehouseCode: string;
   warehouseName: string;
   materialGroup: MaterialGroup;
@@ -525,6 +545,7 @@ export function deriveRows(data: Dataset): DerivedRows {
   for (const loc of data.locations) {
     if (loc.kind !== "cell") continue;
     const warehouse = index.warehouseById.get(loc.warehouseId!)!;
+    const section = loc.zoneId ? index.zoneById.get(loc.zoneId) : undefined;
     const aisle = index.aisleById.get(loc.aisleId!)!;
     const rack = index.rackById.get(loc.rackId!)!;
     const pallet = index.palletByLocation.get(loc.id);
@@ -560,8 +581,13 @@ export function deriveRows(data: Dataset): DerivedRows {
       warehouseId: warehouse.id,
       warehouseCode: warehouse.code,
       warehouseName: warehouse.name,
-      materialGroup: warehouse.materialGroups[0],
-      materialGroupConfirmed: warehouse.materialGroupConfirmed,
+      sectionId: section?.id ?? "",
+      sectionCode: section?.code ?? "",
+      sectionName: section?.name ?? "",
+      sectionStage: section?.stage ?? "",
+      materialGroup: section?.materialGroup ?? warehouse.materialGroups[0],
+      materialGroupConfirmed:
+        section?.materialGroupConfirmed ?? warehouse.materialGroupConfirmed,
       aisleId: aisle.id,
       aisleCode: aisle.code,
       rackId: rack.id,
@@ -621,6 +647,7 @@ export function deriveRows(data: Dataset): DerivedRows {
     const warehouse = loc?.warehouseId
       ? index.warehouseById.get(loc.warehouseId)
       : undefined;
+    const section = loc?.zoneId ? index.zoneById.get(loc.zoneId) : undefined;
     const aisle = loc?.aisleId ? index.aisleById.get(loc.aisleId) : undefined;
     const rack = loc?.rackId ? index.rackById.get(loc.rackId) : undefined;
     const packageType = data.packageTypes.find(
@@ -640,7 +667,11 @@ export function deriveRows(data: Dataset): DerivedRows {
       warehouseId: warehouse?.id,
       warehouseCode: warehouse?.code,
       warehouseName: warehouse?.name,
-      materialGroup: warehouse?.materialGroups[0],
+      sectionId: section?.id ?? "",
+      sectionCode: section?.code ?? "",
+      sectionName: section?.name ?? "",
+      sectionStage: section?.stage ?? "",
+      materialGroup: section?.materialGroup ?? warehouse?.materialGroups[0],
       aisleId: aisle?.id,
       aisleCode: aisle?.code,
       rackId: rack?.id,
@@ -684,6 +715,7 @@ export function deriveRows(data: Dataset): DerivedRows {
       ? index.warehouseById.get(loc.warehouseId)
       : undefined;
     const aisle = loc.aisleId ? index.aisleById.get(loc.aisleId) : undefined;
+    const section = loc.zoneId ? index.zoneById.get(loc.zoneId) : undefined;
     const rack = loc.rackId ? index.rackById.get(loc.rackId) : undefined;
     const capacity = palletCapacityFor(product, variant);
 
@@ -708,6 +740,10 @@ export function deriveRows(data: Dataset): DerivedRows {
       warehouseId: warehouse?.id,
       warehouseCode: warehouse?.code,
       warehouseName: warehouse?.name,
+      sectionId: section?.id ?? "",
+      sectionCode: section?.code ?? "",
+      sectionName: section?.name ?? "",
+      sectionStage: section?.stage ?? "",
       aisleId: aisle?.id,
       aisleCode: aisle?.code,
       rackId: rack?.id,
@@ -929,6 +965,7 @@ export function deriveRows(data: Dataset): DerivedRows {
   for (const rack of data.racks) {
     const rackCells = cellByRack.get(rack.id) ?? [];
     const warehouse = index.warehouseById.get(rack.warehouseId)!;
+    const section = index.zoneById.get(rack.zoneId);
     const aisle = index.aisleById.get(rack.aisleId)!;
     const occupied = rackCells.filter((c) => c.occupied).length;
     const blocked = rackCells.filter((c) => c.blocked).length;
@@ -942,7 +979,11 @@ export function deriveRows(data: Dataset): DerivedRows {
       warehouseId: warehouse.id,
       warehouseCode: warehouse.code,
       warehouseName: warehouse.name,
-      materialGroup: warehouse.materialGroups[0],
+      sectionId: section?.id ?? "",
+      sectionCode: section?.code ?? "",
+      sectionName: section?.name ?? "",
+      sectionStage: section?.stage ?? "",
+      materialGroup: section?.materialGroup ?? warehouse.materialGroups[0],
       aisleId: aisle.id,
       aisleCode: aisle.code,
       profileCode: rack.profileCode,

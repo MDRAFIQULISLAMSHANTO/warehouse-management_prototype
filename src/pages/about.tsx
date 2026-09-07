@@ -9,7 +9,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { runIntegrityChecks } from "@/data/integrity";
-import { TOTAL_DECLARED_POSITIONS, WAREHOUSE_SPECS } from "@/data/layout";
+import { TOTAL_DECLARED_POSITIONS, WAREHOUSE } from "@/data/layout";
 import { DEMO_NOW_ISO, DEMO_TIMEZONE, formatDateTime } from "@/data/clock";
 import { ControlPanel } from "@/odoo/ControlPanel";
 import { formatInt } from "@/odoo/format";
@@ -583,21 +583,26 @@ export function AssumptionsPage() {
           </tr>
         </thead>
         <tbody>
-          {WAREHOUSE_SPECS.map((spec) => (
-            <tr key={spec.id}>
-              <td className="font-medium">{spec.name}</td>
-              <td className="num">{formatInt(spec.declaredBays)}</td>
-              <td className="num">{formatInt(spec.declaredPositions)}</td>
-              <td>
-                {spec.materialGroupConfirmed ? (
-                  <Badge tone="ok">{spec.materialGroups.join(", ")} (confirmed)</Badge>
-                ) : (
-                  <Badge tone="warn">{spec.materialGroups.join(", ")} (unconfirmed)</Badge>
-                )}
-              </td>
-              <td className="text-[var(--o-fs-xs)]">{spec.sheet}</td>
-            </tr>
-          ))}
+          {WAREHOUSE.sections.map((section) => {
+            const bays = section.groups.reduce((sum, g) => sum + g.bays, 0);
+            const positions = section.groups.reduce(
+              (sum, g) => sum + g.declaredPositions,
+              0,
+            );
+            return (
+              <tr key={section.id}>
+                <td className="font-medium">{section.name}</td>
+                <td className="num">{formatInt(bays)}</td>
+                <td className="num">{formatInt(positions)}</td>
+                <td>
+                  <Badge tone="ok">{section.materialGroups.join(", ")}</Badge>
+                </td>
+                <td className="text-[var(--o-fs-xs)]">
+                  Split of {WAREHOUSE.sheet} - proportion assumed
+                </td>
+              </tr>
+            );
+          })}
           <tr>
             <td className="font-medium">Conditional combined total</td>
             <td className="num" />

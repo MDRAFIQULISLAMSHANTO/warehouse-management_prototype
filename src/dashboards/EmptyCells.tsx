@@ -199,14 +199,14 @@ function EmptyCellBody({
 
       <PanelGrid>
         <ChartCard
-          title="Available capacity by warehouse"
-          hint="Positions available for put-away in each warehouse."
+          title="Available capacity by section"
+          hint="Positions available for put-away in each section of the building."
           height={230}
         >
           <CapacityChart
             cells={cells}
             bucket={buckets[active]}
-            keyField="warehouseCode"
+            keyField="sectionCode"
             drill={drill}
             categoryFacet={() =>
               contextFacet("Category", [CATEGORY_LABEL[active]], CATEGORY_DOMAIN[active])
@@ -321,7 +321,7 @@ function CapacityChart({
 }: {
   cells: CellRow[];
   bucket: CellRow[];
-  keyField: "warehouseCode" | "level";
+  keyField: "sectionCode" | "level";
   drill: DrilldownFn;
   categoryFacet: () => Facet;
 }) {
@@ -332,7 +332,7 @@ function CapacityChart({
         ? cell.level === 0
           ? "Ground"
           : `L${cell.level}`
-        : cell.warehouseCode;
+        : cell.sectionCode;
     for (const cell of cells) {
       const key = keyOf(cell);
       const entry = totals.get(key) ?? { label: key, total: 0, matching: 0 };
@@ -382,9 +382,9 @@ function CapacityChart({
                       ),
                     )
                   : contextFacet(
-                      "Warehouse",
+                      "Section",
                       [datum.label],
-                      cond("warehouseCode", "eq", datum.label),
+                      cond("sectionCode", "eq", datum.label),
                     );
               drill({
                 model: "cell",

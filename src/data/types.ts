@@ -23,6 +23,7 @@ export type LocationUsage =
   | "supplier"
   | "customer"
   | "transit"
+  | "production"
   | "inventory";
 
 /** Functional role of a location inside the site. */
@@ -32,6 +33,7 @@ export type LocationKind =
   | "output" // dispatch staging
   | "staging" // floor staging
   | "quality" // quality hold
+  | "production" // issued to / received from production
   | "transit"
   | "supplier"
   | "customer"
@@ -67,13 +69,23 @@ export interface Warehouse {
   footprint: { width: number; depth: number; unit: "ft" };
 }
 
+/**
+ * A section of the warehouse. There is one warehouse building with two
+ * sections: Raw Material, and Packed Tea / Finished Goods. Stock flows
+ * raw -> production -> finished.
+ */
 export interface Zone {
   id: string;
   warehouseId: string;
   code: string;
   name: string;
+  /** Material groups this section holds. */
+  materialGroups: MaterialGroup[];
   materialGroup: MaterialGroup;
   materialGroupConfirmed: boolean;
+  stage: "raw" | "finished";
+  sourceNote: string;
+  positions: number;
 }
 
 export interface Aisle {
@@ -257,7 +269,11 @@ export type OperationKind =
   | "putaway"
   | "internal"
   | "pick"
-  | "delivery";
+  | "delivery"
+  /** Raw material issued out of the Raw section to production. */
+  | "production_issue"
+  /** Finished goods received from production into the FG section. */
+  | "production_receipt";
 
 export type OperationState =
   | "draft"

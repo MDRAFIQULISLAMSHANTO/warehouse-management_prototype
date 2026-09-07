@@ -1,121 +1,136 @@
 # Source Drawing Assumptions
 
-What the supplied drawings actually say, how their capacity tables were decoded,
-and every place this prototype had to assume something.
+What the supplied drawings say, how the capacity table was decoded, and every
+place this prototype had to assume something.
 
 Also available in the application at `/about/assumptions`.
+
+## Structure, as confirmed by Ispahani
+
+There is **one warehouse**, divided into **two sections**:
+
+| Section | Holds | Role in the flow |
+|---|---|---|
+| Raw Material Section | Raw tea (RM) and packing material (PM) | Receives from suppliers, issues to production |
+| Packed Tea / FG Section | Finished goods (FG) | Receives from production, dispatches to customers |
+
+Material flows **Raw → production → Finished Goods**, and finished goods are the
+last stage before dispatch. Production itself is out of scope: there are no
+manufacturing orders and no bills of material. The warehouse sees only the two
+ends of it — an issue out of the Raw section to a virtual production location,
+and a receipt back from it into the FG section. That is exactly how Odoo models
+production from the warehouse side.
 
 ## Documents used
 
 | Document | What it provided |
 |---|---|
 | `SRS_Ispahani_Warehouse_Pallet_Management.pdf` (6 pp) | Requirements, hierarchy, scope, acceptance criteria |
-| `Job 2304 241225-Revise 10-Up3.pdf` (6 pp) | MinMax Job 2304-24122024, Revise 10 dated 29.09.25. Site plan, Raw Tea Warehouse-2, FG warehouse, an R5/R6/6R6 area, baseplate details |
-| `WH-2Job 2579-180825-Revise 2-OP 2.pdf` (3 pp) | MinMax Job 2579-180825, Revise 2 dated 10.02.26. A building drawn as 203' × 79'-8" |
+| `WH-2Job 2579-180825-Revise 2-OP 2.pdf` (3 pp) | **The warehouse modelled here.** MinMax Job 2579-180825, Revise 2 dated 10.02.26, for the building drawn as 203' × 79'-8" |
+| `Job 2304 241225-Revise 10-Up3.pdf` (6 pp) | MinMax Job 2304-24122024, Revise 10 dated 29.09.25. **Superseded** — see below |
 
 Text was extracted with `pypdf`. Page **rendering** was unavailable in the build
 environment, so no drawing geometry could be traced.
 
-## How the capacity tables were decoded
+### Why Job 2304 is not modelled
 
-Each drawing prints a STORAGE CAPACITY table:
+Job 2304 carries three separate storage-capacity tables — a Raw Tea Warehouse-2
+at 1,325 positions, an FG Warehouse at 825, and an untitled R5/R6 area at 548.
+Job 2579 is the **later** drawing (10.02.26 against 29.09.25) and describes the
+building that is actually being fitted out. Ispahani confirmed that Job 2579 is
+the warehouse, so the Job 2304 tables describe a superseded scheme and are not
+part of the model. Nothing from them contributes to any figure in this
+prototype.
+
+## How the capacity table was decoded
+
+The Job 2579 STORAGE CAPACITY table lists, per rack profile:
 
 ```
-RACK NAME | START RACK | EXT. RACK | RACK QTY | TOTAL LEVEL | PALLET PER RACK | TOTAL PALLET
+RACK NAME | RACK SIZE | START RACK | EXT. RACK | RACK QTY | TOTAL LEVEL |
+LOAD/LEVEL | PALLET/RACK | STORAGE CAPACITY (Ton) | TOTAL PALLET
 ```
 
-A "rack" in those tables is one **bay**: a start bay carries two frames, each
+A "rack" in that table is one **bay**: a start bay carries two frames, each
 extension bay adds one and shares the previous one.
 
-Reading PALLET PER RACK against TOTAL LEVEL gives a single rule that reconciles
-**every row of all four tables** without exception:
+Reading PALLET/RACK against TOTAL LEVEL gives a rule that reconciles every row:
 
 > **pallets per bay = (TOTAL LEVEL + 1) × positions per level**
 
 The table's level count is therefore the number of *beam* levels, and the ground
-position is additional. Positions per level is **2** on the 2300 mm profiles and
-**1** on the 1200 mm "H" profiles, matching the elevation details on those sheets.
+position is additional. Positions per level is **2** on the 2300 mm profile (R1)
+and **1** on the 1200 mm profile (R2).
 
-### Worked check — Job 2579, profile R1
+### Worked check — profile R1
 
 - 160 bays × (4 + 1) levels × 2 positions = **1,600 pallets** — the drawing prints 1,600.
 - 160 bays × 4 beam levels × 1,600 kg per level = 1,024,000 kg = **1,024 t**.
 - With R2's 189 t that totals **1,213 t** against **1,895 pallets** — exactly the
   figures printed on the sheet.
 
-`src/data/layout.ts` re-asserts this at startup. If a decoded total ever stopped
-matching a printed total the application would refuse to load rather than show a
-number that disagrees with the client's own drawing.
+## Capacity
 
-## Provisional capacities used
+| Profile | Bay size | Bays | Levels | Positions/level | Positions |
+|---|---|---:|---:|---:|---:|
+| R1 | 2300 × 1000 × 8900 mm | 160 | 5 | 2 | 1,600 |
+| R2 | 1200 × 1000 × 8900 mm | 59 | 5 | 1 | 295 |
+| **Total** | | **219** | | | **1,895** |
 
-| Area | Bays | Pallet positions | Material group | Source sheet |
-|---|---:|---:|---|---|
-| Raw Tea Warehouse-2 | 127 | 1,325 | RM — **confirmed** | Sheet 3 of 6, titled "RAW TEA WAREHOUSE -2" |
-| FG Warehouse | 58 | 825 | FG — **confirmed** | Sheet 4 of 6, titled "FG WAREHOUSE" |
-| R5 / R6 Area | 41 | 548 | PM — **unconfirmed** | Sheet 5 of 6, capacity table only, no area title |
-| Warehouse 203' × 79'-8" | 219 | 1,895 | RM — **unconfirmed** | Job 2579, sheets 1–2 of 3 |
-| **Conditional combined total** | **445** | **4,593** | | Only valid if the four areas are genuinely distinct |
+Split between the two sections:
 
-### Per-profile breakdown
+| Section | R1 bays | R2 bays | Bays | Positions |
+|---|---:|---:|---:|---:|
+| Raw Material | 100 | 34 | 134 | 1,170 |
+| Packed Tea / FG | 60 | 25 | 85 | 725 |
+| **Total** | **160** | **59** | **219** | **1,895** |
 
-**Raw Tea Warehouse-2** (Job 2304): R1 30 bays × 5 levels × 2 = 300 · R1H 7 × 5 × 1 = 35 ·
-R2 75 × 6 × 2 = 900 · R2H 15 × 6 × 1 = 90. Total 127 bays, 1,325 positions.
+Every pallet position is rated **800 kg**. The pallet is 1200 × 1000 mm.
 
-**FG Warehouse** (Job 2304): R3 26 × 7 × 2 = 364 · R3H 3 × 7 × 1 = 21 ·
-R4 9 × 8 × 2 = 144 · R4H 1 × 8 × 1 = 8 · 4R4 17 × 8 × 2 = 272 · 4R4H 2 × 8 × 1 = 16.
-Total 58 bays, 825 positions.
-
-**R5 / R6 Area** (Job 2304): R5 13 × 6 × 2 = 156 · R6 14 × 7 × 2 = 196 ·
-6R6 14 × 7 × 2 = 196. Total 41 bays, 548 positions.
-
-**Job 2579 building**: R1 160 × 5 × 2 = 1,600 · R2 59 × 5 × 1 = 295.
-Total 219 bays, 1,895 positions.
-
-Every pallet position on these drawings is rated **800 kg**. The pallet is
-1200 × 1000 mm.
+`src/data/layout.ts` re-asserts all of this at startup — per section, for the
+building, and against the drawing's own per-profile rows (160 R1 bays, 59 R2
+bays). If a decoded total ever stopped matching a printed total the application
+would refuse to load rather than show a number that disagrees with the client's
+own capacity table.
 
 ## Open questions requiring Ispahani confirmation
 
-1. **Is "WH-2" (Job 2579) the same building as "Raw Tea Warehouse-2" (Job 2304)?**
-   The supplied filename begins "WH-2" and the Job 2304 sheet is titled "RAW TEA
-   WAREHOUSE -2", but they are different jobs with different rack schedules and
-   different building dimensions. They are modelled here as two separate
-   warehouses and are **not** assumed to be the same building. If they are the
-   same, the combined 4,593-position total double-counts and must be reduced.
-2. **What is stored in the R5 / R6 / 6R6 area?** Sheet 5 carries the capacity
-   table but the extracted text has no area title. Packing material is a working
-   assumption for demonstration only.
-3. **What is stored in the Job 2579 building?** Raw material is provisional.
-4. **Aisle naming and rack numbering.** The drawings show rack lines, but the
-   extracted text carries no aisle labelling. Aisle names and rack run
-   identifiers here are a documented schematic. Rack profiles (R1, R2, 4R4, 6R6
-   and the rest) **are** from the drawings and are modelled as profiles, not as
-   rack names; every physical rack has a unique identifier of its own.
-5. **Receipt and delivery routing.** Two-step inbound (receipt into an input
+1. **How are the 219 bays actually split between the two sections?** The drawing
+   gives one capacity table for the whole building and does not say which racking
+   is raw and which is finished goods. The split used here — 134 bays / 1,170
+   positions raw, 85 bays / 725 positions finished — preserves the drawing's own
+   per-profile totals exactly and divides them in the 61.6 : 38.4 proportion the
+   earlier Job 2304 scheme used. **This is the single most important number to
+   confirm**, because it sets the capacity of each section.
+2. **Should packing material have its own section?** PM currently shares the Raw
+   section, because it is also an input to production. If Ispahani keeps it
+   separately, it needs a third section or a sub-zone.
+3. **Aisle naming and rack numbering.** The drawing shows rack lines but the
+   extracted text carries no aisle labelling. Aisle codes (`RAW-A1`, `FG-A1` …)
+   and rack run identifiers are a documented schematic. Rack profiles R1 and R2
+   **are** from the drawing.
+4. **Receipt and delivery routing.** Two-step inbound (receipt into an input
    area, then put-away) and two-step outbound (pick to output, then delivery) are
    assumed throughout.
 
 ## Geometry
 
-Floor plans are **schematic**. Rack runs are laid out to the drawn building
-proportions and the declared bay counts, not to surveyed coordinates. A rack run
-is drawn proportionally to its bay count, and aisles are laid out as bands with
-racking on both sides, which is how a VNA layout works — but plan positions are
-approximate.
+The floor plan is **schematic**. The two sections occupy contiguous bands of one
+plan canvas laid out to the drawn building proportions (203' × 79'-8"), with rack
+runs sized in proportion to their bay counts. Plan positions are not surveyed
+coordinates.
 
 Rack **elevations** are exact in structure: bays, levels and positions per level
-all come from the drawings. They are not exact in millimetre placement.
+all come from the drawing. They are not exact in millimetre placement.
 
-The **3D warehouse** view is built from the same schematic rack runs, so it
-carries exactly the same caveat: the number of positions, bays and levels is
-faithful to the drawings, the arrangement of the runs on the floor is not
-surveyed. Level heights in the 3D view are uniform and illustrative; the
-drawings give real beam heights per profile, which would be applied in the
-implementation.
+The **3D warehouse** carries the same caveat: the number of positions, bays and
+levels is faithful to the drawing, the arrangement of the runs on the floor is
+not. Level heights in 3D are uniform and illustrative; the drawing gives real
+beam heights, which would be applied in the implementation.
 
-Input, output, staging and quality-hold areas are modelled separately per
-warehouse and are deliberately **excluded** from installed-position totals.
+Input, output, staging, quality-hold and the virtual production location are
+modelled separately and are deliberately **excluded** from installed-position
+totals.
 
 ## Demonstration data
 

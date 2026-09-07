@@ -2,49 +2,66 @@
  * Warehouse layout specification derived from the MinMax Rack Industry
  * drawings supplied by the client.
  *
+ *   Job 2579-180825, Revise 2 dated 10.02.26  ("WH-2Job 2579-180825-Revise 2-OP 2.pdf")
  *   Job 2304-24122024, Revise 10 dated 29.09.25  ("Job 2304 241225-Revise 10-Up3.pdf")
- *   Job 2579-180825,   Revise 2  dated 10.02.26  ("WH-2Job 2579-180825-Revise 2-OP 2.pdf")
  *
- * HOW THE DRAWING TABLES WERE READ
- * --------------------------------
- * Each "STORAGE CAPACITY" table lists, per rack profile:
- *   START RACK | EXT. RACK | RACK QTY | TOTAL LEVEL | PALLET PER RACK | TOTAL PALLET
+ * STRUCTURE, AS CONFIRMED BY ISPAHANI
+ * -----------------------------------
+ * There is ONE warehouse: the building drawn as 203' x 79'-8" on Job 2579, the
+ * later of the two jobs. It is divided into TWO sections:
  *
- * A "rack" in those tables is one *bay*: a start bay carries two frames, each
- * extension bay adds one frame and shares the previous one. Reading
- * PALLET PER RACK against TOTAL LEVEL gives a rule that reconciles every single
- * row of all four tables without exception:
+ *   Raw Material section   - incoming tea and packing material
+ *   Packed Tea / FG section - finished goods, after production
+ *
+ * Material flows Raw -> production -> Finished Goods, and finished goods are
+ * the last stage before dispatch. Production itself is out of scope (no
+ * manufacturing orders, no bills of material); the warehouse sees it as an
+ * issue out of the Raw section and a receipt into the FG section.
+ *
+ * The three storage-capacity tables on Job 2304 (Raw Tea Warehouse-2 at 1,325
+ * positions, FG Warehouse at 825, and an R5/R6 area at 548) describe an earlier
+ * scheme and are superseded by Job 2579. They are not modelled.
+ *
+ * HOW THE CAPACITY TABLE WAS READ
+ * -------------------------------
+ * The Job 2579 STORAGE CAPACITY table lists, per rack profile:
+ *   RACK SIZE | START RACK | EXT. RACK | RACK QTY | TOTAL LEVEL | LOAD/LEVEL |
+ *   PALLET/RACK | STORAGE CAPACITY (Ton) | TOTAL PALLET
+ *
+ * A "rack" in that table is one *bay*: a start bay carries two frames, each
+ * extension bay adds one and shares the previous one. Reading PALLET/RACK
+ * against TOTAL LEVEL gives a rule that reconciles every row:
  *
  *     pallets per bay = (TOTAL LEVEL + 1) x positions per level
  *
  * i.e. the table's level count is the number of *beam* levels and the ground
- * position is additional. Positions per level is 2 on the 2300 mm profiles
- * (R1, R2, R3, R4, 4R4, R5, R6, 6R6 on Job 2304) and 1 on the 1200 mm "H"
- * profiles, which matches the elevation details on those sheets.
+ * position is additional. Positions per level is 2 on the 2300 mm profile and
+ * 1 on the 1200 mm profile.
  *
- * Worked check, Job 2579 R1: 160 bays x (4+1) levels x 2 = 1,600 pallets, and
+ * Worked check, profile R1: 160 bays x (4+1) levels x 2 = 1,600 pallets, and
  * 160 x 4 x 1,600 kg/level = 1,024,000 kg = 1,024 t. The drawing prints exactly
- * 1600 and 1213 t total against 1,895 pallets. Every other row agrees too; the
- * assertions at the bottom of this file re-check it at runtime.
+ * 1600 and, with R2's 189 t, a 1,213 t total against 1,895 pallets.
  *
  * WHAT IS ASSUMED, NOT DRAWN
  * --------------------------
- * - Grouping of bays into named rack runs and aisles. The drawings show rack
- *   lines but the extracted text carries no aisle labelling, so runs and aisle
- *   names here are a documented schematic.
+ * - The split of the 219 bays between the two sections. The drawing gives one
+ *   capacity table for the whole building and does not say which racking is
+ *   raw and which is finished goods. The split used here keeps both profiles in
+ *   both sections and follows the Raw:FG proportion of the earlier Job 2304
+ *   scheme (1,325 : 825, or 61.6% : 38.4%). It must be confirmed.
+ * - Grouping of bays into named rack runs, and aisle naming. The drawings show
+ *   rack lines but the extracted text carries no aisle labelling.
  * - Floor-plan geometry. PDF page rendering was unavailable, so plan positions
- *   are schematic rectangles laid out to the drawn building proportions, not
- *   traced coordinates.
- * - Material group per area, except where the drawing labels it.
+ *   are schematic rectangles laid out to the drawn building proportions.
  */
 
 import type { MaterialGroup, RackProfile } from "./types";
 
+export const DRAWING_JOB_2579 = "MinMax Job 2579-180825, Revise 2 (10.02.26)";
 export const DRAWING_JOB_2304 =
   "MinMax Job 2304-24122024, Revise 10 (29.09.25)";
-export const DRAWING_JOB_2579 = "MinMax Job 2579-180825, Revise 2 (10.02.26)";
 
-/** Every pallet position on these drawings is rated 800 kg. */
+/** Every pallet position on this drawing is rated 800 kg. */
 export const PALLET_LOAD_KG = 800;
 
 export interface ProfileGroupSpec {
@@ -54,8 +71,22 @@ export interface ProfileGroupSpec {
   /** TOTAL LEVEL from the table (beam levels; ground position is extra). */
   beamLevels: number;
   positionsPerLevel: number;
-  /** TOTAL PALLET printed on the drawing, used as a runtime check. */
+  /** Positions this group contributes, used as a runtime check. */
   declaredPositions: number;
+}
+
+export interface SectionSpec {
+  id: string;
+  code: string;
+  name: string;
+  /** Material groups stored in this section. */
+  materialGroups: MaterialGroup[];
+  materialGroupConfirmed: boolean;
+  /** Where this section sits in the Raw -> production -> FG flow. */
+  stage: "raw" | "finished";
+  sourceNote: string;
+  aisles: number;
+  groups: ProfileGroupSpec[];
 }
 
 export interface WarehouseSpec {
@@ -65,17 +96,19 @@ export interface WarehouseSpec {
   siteId: string;
   drawingRef: string;
   sheet: string;
-  materialGroups: MaterialGroup[];
-  materialGroupConfirmed: boolean;
   sourceNote: string;
+  /** TOTAL PALLET printed on the drawing. */
   declaredPositions: number;
+  /** TOTAL RACK printed on the drawing (bays). */
   declaredBays: number;
   footprint: { width: number; depth: number; unit: "ft" };
-  /** Aisle count used by the schematic layout. */
-  aisles: number;
-  groups: ProfileGroupSpec[];
+  sections: SectionSpec[];
 }
 
+/**
+ * Rack profiles as drawn on Job 2579. R1 is the 2300 mm bay carrying two
+ * pallet positions per level; R2 is the 1200 mm bay carrying one.
+ */
 export const RACK_PROFILES: RackProfile[] = [
   {
     code: "R1",
@@ -84,127 +117,10 @@ export const RACK_PROFILES: RackProfile[] = [
     heightMm: 8900,
     loadPerLevelKg: 1600,
     palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R1H",
-    bayWidthMm: 1200,
-    depthMm: 1000,
-    heightMm: 8900,
-    loadPerLevelKg: 800,
-    palletsPerBayLevel: 1,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R2",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 10000,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R2H",
-    bayWidthMm: 1200,
-    depthMm: 1000,
-    heightMm: 12000,
-    loadPerLevelKg: 800,
-    palletsPerBayLevel: 1,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R3",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 10500,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R3H",
-    bayWidthMm: 1200,
-    depthMm: 1000,
-    heightMm: 10500,
-    loadPerLevelKg: 800,
-    palletsPerBayLevel: 1,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R4",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 10800,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R4H",
-    bayWidthMm: 1200,
-    depthMm: 1000,
-    heightMm: 10800,
-    loadPerLevelKg: 800,
-    palletsPerBayLevel: 1,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "4R4",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 12000,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "4R4H",
-    bayWidthMm: 1200,
-    depthMm: 1000,
-    heightMm: 12000,
-    loadPerLevelKg: 800,
-    palletsPerBayLevel: 1,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R5",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 9834,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "R6",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 11339,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "6R6",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 11339,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
-    drawingRef: DRAWING_JOB_2304,
-  },
-  {
-    code: "J79-R1",
-    bayWidthMm: 2300,
-    depthMm: 1000,
-    heightMm: 8900,
-    loadPerLevelKg: 1600,
-    palletsPerBayLevel: 2,
     drawingRef: DRAWING_JOB_2579,
   },
   {
-    code: "J79-R2",
+    code: "R2",
     bayWidthMm: 1200,
     depthMm: 1000,
     heightMm: 8900,
@@ -214,185 +130,83 @@ export const RACK_PROFILES: RackProfile[] = [
   },
 ];
 
-export const WAREHOUSE_SPECS: WarehouseSpec[] = [
-  {
-    id: "wh_rtw2",
-    code: "RTW2",
-    name: "Raw Tea Warehouse-2",
-    siteId: "site_2304",
-    drawingRef: DRAWING_JOB_2304,
-    sheet: "Sheet 3 of 6 - RAW TEA WAREHOUSE -2",
-    materialGroups: ["RM"],
-    materialGroupConfirmed: true,
-    sourceNote:
-      "Sheet titled 'RAW TEA WAREHOUSE -2'. Raw-material use is stated on the drawing.",
-    declaredPositions: 1325,
-    declaredBays: 127,
-    footprint: { width: 100, depth: 94.67, unit: "ft" },
-    aisles: 6,
-    groups: [
-      {
-        profileCode: "R1",
-        bays: 30,
-        beamLevels: 4,
-        positionsPerLevel: 2,
-        declaredPositions: 300,
-      },
-      {
-        profileCode: "R1H",
-        bays: 7,
-        beamLevels: 4,
-        positionsPerLevel: 1,
-        declaredPositions: 35,
-      },
-      {
-        profileCode: "R2",
-        bays: 75,
-        beamLevels: 5,
-        positionsPerLevel: 2,
-        declaredPositions: 900,
-      },
-      {
-        profileCode: "R2H",
-        bays: 15,
-        beamLevels: 5,
-        positionsPerLevel: 1,
-        declaredPositions: 90,
-      },
-    ],
-  },
-  {
-    id: "wh_fg",
-    code: "FGW",
-    name: "FG Warehouse",
-    siteId: "site_2304",
-    drawingRef: DRAWING_JOB_2304,
-    sheet: "Sheet 4 of 6 - FG WAREHOUSE",
-    materialGroups: ["FG"],
-    materialGroupConfirmed: true,
-    sourceNote:
-      "Sheet titled 'FG WAREHOUSE'. Finished-goods use is stated on the drawing.",
-    declaredPositions: 825,
-    declaredBays: 58,
-    footprint: { width: 100, depth: 50.17, unit: "ft" },
-    aisles: 4,
-    groups: [
-      {
-        profileCode: "R3",
-        bays: 26,
-        beamLevels: 6,
-        positionsPerLevel: 2,
-        declaredPositions: 364,
-      },
-      {
-        profileCode: "R3H",
-        bays: 3,
-        beamLevels: 6,
-        positionsPerLevel: 1,
-        declaredPositions: 21,
-      },
-      {
-        profileCode: "R4",
-        bays: 9,
-        beamLevels: 7,
-        positionsPerLevel: 2,
-        declaredPositions: 144,
-      },
-      {
-        profileCode: "R4H",
-        bays: 1,
-        beamLevels: 7,
-        positionsPerLevel: 1,
-        declaredPositions: 8,
-      },
-      {
-        profileCode: "4R4",
-        bays: 17,
-        beamLevels: 7,
-        positionsPerLevel: 2,
-        declaredPositions: 272,
-      },
-      {
-        profileCode: "4R4H",
-        bays: 2,
-        beamLevels: 7,
-        positionsPerLevel: 1,
-        declaredPositions: 16,
-      },
-    ],
-  },
-  {
-    id: "wh_r56",
-    code: "R56",
-    name: "R5 / R6 Area",
-    siteId: "site_2304",
-    drawingRef: DRAWING_JOB_2304,
-    sheet: "Sheet 5 of 6 - R5 / R6 / 6R6 storage capacity table",
-    materialGroups: ["PM"],
-    materialGroupConfirmed: false,
-    sourceNote:
-      "UNCONFIRMED USE. Sheet 5 gives the R5/R6/6R6 capacity table but the extracted text carries no area title. Packing-material use is a provisional working assumption for the demonstration only and must be confirmed with Ispahani.",
-    declaredPositions: 548,
-    declaredBays: 41,
-    footprint: { width: 59, depth: 119.42, unit: "ft" },
-    aisles: 3,
-    groups: [
-      {
-        profileCode: "R5",
-        bays: 13,
-        beamLevels: 5,
-        positionsPerLevel: 2,
-        declaredPositions: 156,
-      },
-      {
-        profileCode: "R6",
-        bays: 14,
-        beamLevels: 6,
-        positionsPerLevel: 2,
-        declaredPositions: 196,
-      },
-      {
-        profileCode: "6R6",
-        bays: 14,
-        beamLevels: 6,
-        positionsPerLevel: 2,
-        declaredPositions: 196,
-      },
-    ],
-  },
-  {
-    id: "wh_j2579",
-    code: "WH2",
-    name: "Warehouse 203' x 79'-8\"",
-    siteId: "site_2579",
-    drawingRef: DRAWING_JOB_2579,
-    sheet: "Sheets 1-2 of 3 - WARE HOUSE 203' x 79'-8\"",
-    materialGroups: ["RM"],
-    materialGroupConfirmed: false,
-    sourceNote:
-      "UNCONFIRMED USE AND IDENTITY. Separate MinMax job (2579) for a building drawn as 203' x 79'-8\". The supplied file is named 'WH-2...' but this is NOT assumed to be the same building as 'Raw Tea Warehouse-2' on Job 2304; the two are modelled as distinct warehouses until Ispahani confirms. Raw-material use is provisional.",
-    declaredPositions: 1895,
-    declaredBays: 219,
-    footprint: { width: 203, depth: 79.67, unit: "ft" },
-    aisles: 8,
-    groups: [
-      {
-        profileCode: "J79-R1",
-        bays: 160,
-        beamLevels: 4,
-        positionsPerLevel: 2,
-        declaredPositions: 1600,
-      },
-      {
-        profileCode: "J79-R2",
-        bays: 59,
-        beamLevels: 4,
-        positionsPerLevel: 1,
-        declaredPositions: 295,
-      },
-    ],
-  },
-];
+/**
+ * The bay split between the two sections.
+ *
+ * ASSUMPTION. The drawing gives one table for the whole building. These numbers
+ * preserve the drawing's own totals exactly - 160 R1 bays and 59 R2 bays,
+ * 1,895 positions - and divide them in the 61.6 : 38.4 proportion the earlier
+ * Job 2304 scheme used between raw and finished goods.
+ */
+export const WAREHOUSE: WarehouseSpec = {
+  id: "wh_main",
+  code: "WH",
+  name: "Ispahani Tea Warehouse",
+  siteId: "site_main",
+  drawingRef: DRAWING_JOB_2579,
+  sheet: 'Sheets 1-2 of 3 - WARE HOUSE 203\' x 79\'-8"',
+  sourceNote:
+    'One building, drawn as 203\' x 79\'-8" on MinMax Job 2579 (Revise 2, 10.02.26), divided into a Raw Material section and a Packed Tea / Finished Goods section. The three capacity tables on the earlier Job 2304 describe a superseded scheme and are not modelled.',
+  declaredPositions: 1895,
+  declaredBays: 219,
+  footprint: { width: 203, depth: 79.67, unit: "ft" },
+  sections: [
+    {
+      id: "sec_raw",
+      code: "RAW",
+      name: "Raw Material Section",
+      materialGroups: ["RM", "PM"],
+      materialGroupConfirmed: true,
+      stage: "raw",
+      sourceNote:
+        "Incoming tea and packing material, held until it is issued to production. Packing material shares this section because it is also an input to production; confirm whether Ispahani wants it separated.",
+      aisles: 5,
+      groups: [
+        {
+          profileCode: "R1",
+          bays: 100,
+          beamLevels: 4,
+          positionsPerLevel: 2,
+          declaredPositions: 1000,
+        },
+        {
+          profileCode: "R2",
+          bays: 34,
+          beamLevels: 4,
+          positionsPerLevel: 1,
+          declaredPositions: 170,
+        },
+      ],
+    },
+    {
+      id: "sec_fg",
+      code: "FG",
+      name: "Packed Tea / FG Section",
+      materialGroups: ["FG"],
+      materialGroupConfirmed: true,
+      stage: "finished",
+      sourceNote:
+        "Finished goods received from production and held until dispatch. This is the last stage before the customer.",
+      aisles: 3,
+      groups: [
+        {
+          profileCode: "R1",
+          bays: 60,
+          beamLevels: 4,
+          positionsPerLevel: 2,
+          declaredPositions: 600,
+        },
+        {
+          profileCode: "R2",
+          bays: 25,
+          beamLevels: 4,
+          positionsPerLevel: 1,
+          declaredPositions: 125,
+        },
+      ],
+    },
+  ],
+};
 
 /** Positions per bay under the decoded rule. */
 export function positionsPerBay(group: ProfileGroupSpec): number {
@@ -405,45 +219,63 @@ export function levelsPerBay(group: ProfileGroupSpec): number {
 }
 
 /**
- * Re-verify the decoded rule against every number printed on the drawings.
- * Throwing here beats shipping a dashboard whose totals silently drift from
- * the client's own capacity tables.
+ * Re-verify the decoded layout against the numbers printed on the drawing.
+ *
+ * Two things are checked: that each section's own arithmetic holds, and that
+ * the sections together still reproduce the drawing's per-profile totals
+ * (160 R1 bays, 59 R2 bays, 1,895 positions, 219 bays). Throwing here beats
+ * shipping a dashboard whose totals silently drift from the client's own
+ * capacity table.
  */
-function verifySpecs(): void {
-  for (const wh of WAREHOUSE_SPECS) {
-    let positions = 0;
-    let bays = 0;
-    for (const group of wh.groups) {
+function verifySpec(): void {
+  const perProfile = new Map<string, { bays: number; positions: number }>();
+  let positions = 0;
+  let bays = 0;
+
+  for (const section of WAREHOUSE.sections) {
+    for (const group of section.groups) {
       const computed = group.bays * positionsPerBay(group);
       if (computed !== group.declaredPositions) {
         throw new Error(
-          `Layout mismatch in ${wh.code}/${group.profileCode}: computed ${computed} positions but the drawing declares ${group.declaredPositions}.`,
+          `Layout mismatch in ${section.code}/${group.profileCode}: computed ${computed} positions but the spec declares ${group.declaredPositions}.`,
         );
       }
       positions += computed;
       bays += group.bays;
+      const tally = perProfile.get(group.profileCode) ?? { bays: 0, positions: 0 };
+      tally.bays += group.bays;
+      tally.positions += computed;
+      perProfile.set(group.profileCode, tally);
     }
-    if (positions !== wh.declaredPositions) {
+  }
+
+  if (positions !== WAREHOUSE.declaredPositions) {
+    throw new Error(
+      `Layout mismatch: sections total ${positions} positions but the drawing declares ${WAREHOUSE.declaredPositions}.`,
+    );
+  }
+  if (bays !== WAREHOUSE.declaredBays) {
+    throw new Error(
+      `Layout mismatch: sections total ${bays} bays but the drawing declares ${WAREHOUSE.declaredBays}.`,
+    );
+  }
+
+  // The drawing's own per-profile rows, which the split must not disturb.
+  const drawn = { R1: { bays: 160, positions: 1600 }, R2: { bays: 59, positions: 295 } };
+  for (const [code, expected] of Object.entries(drawn)) {
+    const actual = perProfile.get(code);
+    if (!actual || actual.bays !== expected.bays || actual.positions !== expected.positions) {
       throw new Error(
-        `Layout mismatch in ${wh.code}: computed ${positions} positions but the drawing declares ${wh.declaredPositions}.`,
-      );
-    }
-    if (bays !== wh.declaredBays) {
-      throw new Error(
-        `Layout mismatch in ${wh.code}: computed ${bays} bays but the drawing declares ${wh.declaredBays}.`,
+        `Layout mismatch for profile ${code}: sections give ${actual?.bays ?? 0} bays / ${actual?.positions ?? 0} positions, the drawing prints ${expected.bays} / ${expected.positions}.`,
       );
     }
   }
 }
 
-verifySpecs();
+verifySpec();
 
-export const TOTAL_DECLARED_POSITIONS = WAREHOUSE_SPECS.reduce(
-  (sum, wh) => sum + wh.declaredPositions,
-  0,
-);
+export const TOTAL_DECLARED_POSITIONS = WAREHOUSE.declaredPositions;
+export const TOTAL_DECLARED_BAYS = WAREHOUSE.declaredBays;
 
-export const TOTAL_DECLARED_BAYS = WAREHOUSE_SPECS.reduce(
-  (sum, wh) => sum + wh.declaredBays,
-  0,
-);
+/** Convenience: every section, for callers that iterate them. */
+export const SECTIONS = WAREHOUSE.sections;

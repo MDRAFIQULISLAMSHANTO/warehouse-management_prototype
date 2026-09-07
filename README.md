@@ -8,9 +8,28 @@ built from Ispahani's own MinMax rack drawings.
 
 > **This is a demonstration, not a system of record.** All stock, lots, pallets,
 > operators, suppliers and customers are generated illustrative data. Warehouse
-> capacities come from the supplied drawings and reconcile with them exactly;
+> capacity comes from the supplied drawing and reconciles with it exactly;
 > floor-plan geometry is schematic. See
 > [docs/drawing-assumptions.md](docs/drawing-assumptions.md).
+
+## The warehouse
+
+**One warehouse**, the building drawn as 203' × 79'-8" on MinMax Job 2579,
+**1,895 installed pallet positions**, divided into **two sections**:
+
+| Section | Holds | Bays | Positions |
+|---|---|---:|---:|
+| Raw Material | Raw tea and packing material | 134 | 1,170 |
+| Packed Tea / FG | Finished goods | 85 | 725 |
+
+Stock flows **Raw → production → Finished Goods**. Production itself is out of
+scope — no manufacturing orders, no bills of material — so the warehouse sees
+only its two ends: an issue out of the Raw section to a virtual production
+location, and a receipt back from it into the FG section, which is how Odoo
+models production from the warehouse side.
+
+The three capacity tables on the earlier Job 2304 drawing describe a superseded
+scheme and are not modelled.
 
 ---
 

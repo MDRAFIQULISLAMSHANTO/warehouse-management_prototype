@@ -202,11 +202,11 @@ function ProductBody({
 
       <PanelGrid>
         <ChartCard
-          title={`Warehouse distribution (${unit})`}
-          hint="Where this product is stored."
+          title={`Section distribution (${unit})`}
+          hint="Which section of the building holds this product."
           height={230}
         >
-          <DistributionChart stock={stock} field="warehouseCode" unit={unit} drill={drill} />
+          <DistributionChart stock={stock} field="sectionCode" unit={unit} drill={drill} />
         </ChartCard>
         <ChartCard
           title={`Location distribution (${unit})`}
@@ -257,7 +257,7 @@ function DistributionChart({
   limit,
 }: {
   stock: StockRow[];
-  field: "warehouseCode" | "aisleCode";
+  field: "sectionCode" | "aisleCode";
   unit: string;
   limit?: number;
   drill: DrilldownFn;
@@ -302,7 +302,7 @@ function DistributionChart({
               model: "stock",
               facets: [
                 contextFacet(
-                  field === "aisleCode" ? "Aisle" : "Warehouse",
+                  field === "aisleCode" ? "Aisle" : "Section",
                   [datum.label],
                   cond(field, "eq", datum.label),
                 ),

@@ -30,7 +30,7 @@ import { DEMO_NOW_ISO, addDays, addHours, demoNow } from "./clock";
 import {
   PALLET_LOAD_KG,
   RACK_PROFILES,
-  WAREHOUSE_SPECS,
+  WAREHOUSE,
   levelsPerBay,
   type ProfileGroupSpec,
 } from "./layout";
@@ -66,13 +66,15 @@ const PACKAGING_SUPPLIERS: Partner[] = SUPPLIERS.filter(
 export const SEED_VERSION = "1.0.0";
 const SEED = 20260906;
 
-/** Target physical occupancy per warehouse — chosen to give each dashboard a
- *  distinct, readable profile rather than four identical bars. */
+/**
+ * Target physical occupancy per section.
+ *
+ * Raw runs fuller than finished goods, which is the usual shape: raw tea is
+ * bought in campaigns and held, finished goods turn over against orders.
+ */
 const OCCUPANCY_TARGET: Record<string, number> = {
-  wh_rtw2: 0.74,
-  wh_fg: 0.63,
-  wh_r56: 0.51,
-  wh_j2579: 0.58,
+  sec_raw: 0.74,
+  sec_fg: 0.58,
 };
 
 /** Share of occupied positions holding a partially filled pallet. */
@@ -131,18 +133,27 @@ export function buildDataset(): Dataset {
 
   const sites: Site[] = [
     {
-      id: "site_2304",
-      name: "Ispahani Tea - Main Site (Job 2304 layout)",
-      drawingRef: "MinMax Job 2304-24122024, Revise 10 (29.09.25)",
-    },
-    {
-      id: "site_2579",
-      name: "Ispahani Tea - Warehouse Building (Job 2579 layout)",
-      drawingRef: "MinMax Job 2579-180825, Revise 2 (10.02.26)",
+      id: "site_main",
+      name: "Ispahani Tea - Warehouse Site",
+      drawingRef: WAREHOUSE.drawingRef,
     },
   ];
 
-  const warehouses: Warehouse[] = [];
+  const warehouses: Warehouse[] = [
+    {
+      id: WAREHOUSE.id,
+      code: WAREHOUSE.code,
+      name: WAREHOUSE.name,
+      siteId: WAREHOUSE.siteId,
+      materialGroups: ["RM", "PM", "FG"],
+      materialGroupConfirmed: true,
+      drawingRef: WAREHOUSE.drawingRef,
+      sourceNote: WAREHOUSE.sourceNote,
+      declaredPositions: WAREHOUSE.declaredPositions,
+      footprint: WAREHOUSE.footprint,
+    },
+  ];
+
   const zones: Zone[] = [];
   const aisles: Aisle[] = [];
   const racks: Rack[] = [];
@@ -150,62 +161,64 @@ export function buildDataset(): Dataset {
 
   let rackSeq = 0;
 
-  for (const spec of WAREHOUSE_SPECS) {
-    warehouses.push({
-      id: spec.id,
-      code: spec.code,
-      name: spec.name,
-      siteId: spec.siteId,
-      materialGroups: spec.materialGroups,
-      materialGroupConfirmed: spec.materialGroupConfirmed,
-      drawingRef: spec.drawingRef,
-      sourceNote: spec.sourceNote,
-      declaredPositions: spec.declaredPositions,
-      footprint: spec.footprint,
-    });
+  // One building, so the two sections share one plan canvas: each takes a
+  // contiguous run of aisle bands rather than getting a canvas of its own.
+  const planHeight = Math.round(
+    (PLAN_WIDTH * WAREHOUSE.footprint.depth) / WAREHOUSE.footprint.width,
+  );
+  const totalAisles = WAREHOUSE.sections.reduce((sum, x) => sum + x.aisles, 0);
+  const bandHeight = planHeight / totalAisles;
+  const rackDepth = Math.min(26, bandHeight * 0.3);
+  const margin = PLAN_WIDTH * 0.03;
+  let aisleOffset = 0;
 
-    const primaryGroup = spec.materialGroups[0];
-    const zoneId = `zn_${spec.code.toLowerCase()}`;
+  for (const section of WAREHOUSE.sections) {
+    const primaryGroup = section.materialGroups[0];
+    const zoneId = section.id;
+
     zones.push({
       id: zoneId,
-      warehouseId: spec.id,
-      code: `${spec.code}-Z1`,
-      name: `${spec.name} - Racking`,
+      warehouseId: WAREHOUSE.id,
+      code: section.code,
+      name: section.name,
+      materialGroups: section.materialGroups,
       materialGroup: primaryGroup,
-      materialGroupConfirmed: spec.materialGroupConfirmed,
+      materialGroupConfirmed: section.materialGroupConfirmed,
+      stage: section.stage,
+      sourceNote: section.sourceNote,
+      positions: section.groups.reduce((sum, g) => sum + g.declaredPositions, 0),
     });
 
-    for (let a = 0; a < spec.aisles; a++) {
-      aisles.push({
-        id: `ai_${spec.code.toLowerCase()}_${a + 1}`,
-        warehouseId: spec.id,
+    // Aisle codes are qualified by section. Both sections number their aisles
+    // from 1, so a bare "A1" would be ambiguous across the building - and any
+    // chart or grouping keyed on the code would silently merge two aisles.
+    const sectionAisles: Aisle[] = [];
+    for (let a = 0; a < section.aisles; a++) {
+      const aisle: Aisle = {
+        id: `ai_${section.code.toLowerCase()}_${a + 1}`,
+        warehouseId: WAREHOUSE.id,
         zoneId,
-        code: `A${a + 1}`,
-        name: `Aisle ${a + 1}`,
+        code: `${section.code}-A${a + 1}`,
+        name: `${section.name} - Aisle ${a + 1}`,
         sequence: a + 1,
-      });
+      };
+      sectionAisles.push(aisle);
+      aisles.push(aisle);
     }
 
     // --- rack runs ------------------------------------------------------
     const runs: RackRunSpec[] = [];
-    for (const group of spec.groups) runs.push(...splitIntoRuns(group));
+    for (const group of section.groups) runs.push(...splitIntoRuns(group));
 
     // Distribute runs across aisles and sides so both sides of every aisle
     // carry racking, the way a VNA layout works.
     const perAisle: RackRunSpec[][] = Array.from(
-      { length: spec.aisles },
+      { length: section.aisles },
       () => [],
     );
-    runs.forEach((run, i) => perAisle[i % spec.aisles].push(run));
+    runs.forEach((run, i) => perAisle[i % section.aisles].push(run));
 
-    const planHeight = Math.round(
-      (PLAN_WIDTH * spec.footprint.depth) / spec.footprint.width,
-    );
-    const bandHeight = planHeight / spec.aisles;
-    const rackDepth = Math.min(26, bandHeight * 0.3);
-    const margin = PLAN_WIDTH * 0.03;
-
-    // One bay width for the whole warehouse, so a 7-bay run is visibly shorter
+    // One bay width for the whole section, so a 7-bay run is visibly shorter
     // than a 16-bay run instead of both stretching to fill their side.
     const gap = 6;
     const usable = PLAN_WIDTH - margin * 2;
@@ -215,18 +228,16 @@ export function buildDataset(): Dataset {
         const a = aisleRuns.filter((_, i) => i % 2 === 0);
         const b = aisleRuns.filter((_, i) => i % 2 === 1);
         return [
-          a.reduce((s, r) => s + r.bays, 0) + gap * Math.max(0, a.length - 1),
-          b.reduce((s, r) => s + r.bays, 0) + gap * Math.max(0, b.length - 1),
+          a.reduce((sum, r) => sum + r.bays, 0) + gap * Math.max(0, a.length - 1),
+          b.reduce((sum, r) => sum + r.bays, 0) + gap * Math.max(0, b.length - 1),
         ];
       }),
     );
     const bayWidth = Math.max(3.5, usable / widestSide);
 
     perAisle.forEach((aisleRuns, aisleIndex) => {
-      const aisle = aisles.find(
-        (x) => x.warehouseId === spec.id && x.sequence === aisleIndex + 1,
-      )!;
-      const bandTop = aisleIndex * bandHeight;
+      const aisle = sectionAisles[aisleIndex];
+      const bandTop = (aisleOffset + aisleIndex) * bandHeight;
       const sideA = aisleRuns.filter((_, i) => i % 2 === 0);
       const sideB = aisleRuns.filter((_, i) => i % 2 === 1);
 
@@ -243,21 +254,22 @@ export function buildDataset(): Dataset {
         for (const run of sideRuns) {
           rackSeq += 1;
           const profile = RACK_PROFILES.find(
-            (p) => p.code === run.profileCode,
+            (x) => x.code === run.profileCode,
           )!;
           const width = run.bays * bayWidth;
-          const rackId = `rk_${spec.code.toLowerCase()}_${pad(rackSeq, 4)}`;
+          const rackId = `rk_${section.code.toLowerCase()}_${pad(rackSeq, 4)}`;
           // The rack code is globally unique; the short label is what appears
           // inside a location path, so an address does not repeat its prefix.
           const rackShort = `R${pad(rackSeq, 3)}`;
-          const rackCode = `${spec.code}-${aisle.code}-${rackShort}`;
+          const aisleShort = `A${aisle.sequence}`;
+          const rackCode = `${aisle.code}-${rackShort}`;
           const positions = run.bays * run.levels * run.positionsPerLevel;
 
           racks.push({
             id: rackId,
             code: rackCode,
             name: `Rack ${rackCode} (${profile.code})`,
-            warehouseId: spec.id,
+            warehouseId: WAREHOUSE.id,
             zoneId,
             aisleId: aisle.id,
             profileCode: profile.code,
@@ -309,10 +321,10 @@ export function buildDataset(): Dataset {
                   id: `loc_${rackId}_${bay}_${level}_${slot}`,
                   code: cellCode,
                   name: cellCode,
-                  completeName: `${spec.code}/${aisle.code}/${rackShort}/${cellCode}`,
+                  completeName: `${section.code}/${aisleShort}/${rackShort}/${cellCode}`,
                   kind: "cell",
                   usage: "internal",
-                  warehouseId: spec.id,
+                  warehouseId: WAREHOUSE.id,
                   zoneId,
                   aisleId: aisle.id,
                   rackId,
@@ -338,34 +350,37 @@ export function buildDataset(): Dataset {
       }
     });
 
-    // --- logical locations ---------------------------------------------
-    const logical: {
-      key: string;
-      code: string;
-      name: string;
-      kind: Location["kind"];
-    }[] = [
-      { key: "in", code: "IN", name: "Input / Goods-In", kind: "input" },
-      { key: "out", code: "OUT", name: "Output / Dispatch Staging", kind: "output" },
-      { key: "stg", code: "STG", name: "Floor Staging", kind: "staging" },
-      { key: "qc", code: "QC", name: "Quality Hold", kind: "quality" },
-    ];
-    for (const l of logical) {
-      locations.push({
-        id: `loc_${spec.code.toLowerCase()}_${l.key}`,
-        code: `${spec.code}/${l.code}`,
-        name: l.name,
-        completeName: `${spec.code}/${l.code}`,
-        kind: l.kind,
-        usage: "internal",
-        warehouseId: spec.id,
-        zoneId,
-        isPosition: false,
-        palletCapacity: 999,
-        maxWeightKg: 0,
-        blocked: false,
-      });
-    }
+    aisleOffset += section.aisles;
+  }
+
+  // --- logical locations, one set for the building ----------------------
+  const logical: {
+    key: string;
+    code: string;
+    name: string;
+    kind: Location["kind"];
+    zoneId?: string;
+  }[] = [
+    { key: "in", code: "IN", name: "Input / Goods-In", kind: "input", zoneId: "sec_raw" },
+    { key: "out", code: "OUT", name: "Output / Dispatch Staging", kind: "output", zoneId: "sec_fg" },
+    { key: "stg", code: "STG", name: "Floor Staging", kind: "staging" },
+    { key: "qc", code: "QC", name: "Quality Hold", kind: "quality", zoneId: "sec_raw" },
+  ];
+  for (const l of logical) {
+    locations.push({
+      id: `loc_${WAREHOUSE.code.toLowerCase()}_${l.key}`,
+      code: `${WAREHOUSE.code}/${l.code}`,
+      name: l.name,
+      completeName: `${WAREHOUSE.code}/${l.code}`,
+      kind: l.kind,
+      usage: "internal",
+      warehouseId: WAREHOUSE.id,
+      zoneId: l.zoneId,
+      isPosition: false,
+      palletCapacity: 999,
+      maxWeightKg: 0,
+      blocked: false,
+    });
   }
 
   // Site-wide virtual locations, as in Odoo.
@@ -401,6 +416,18 @@ export function buildDataset(): Dataset {
       completeName: "Transit/Inter-warehouse",
       kind: "transit",
       usage: "transit",
+      isPosition: false,
+      palletCapacity: 0,
+      maxWeightKg: 0,
+      blocked: false,
+    },
+    {
+      id: "loc_production",
+      code: "Virtual/Production",
+      name: "Production",
+      completeName: "Virtual/Production",
+      kind: "production",
+      usage: "production",
       isPosition: false,
       palletCapacity: 0,
       maxWeightKg: 0,
@@ -444,6 +471,28 @@ export function buildDataset(): Dataset {
         warehouseId: wh.id,
         sequencePrefix: `${wh.code}/PUT/`,
         defaultSourceId: inLoc,
+      },
+      // The two ends of production. Manufacturing itself is out of scope: the
+      // warehouse issues raw material to a virtual production location and
+      // receives finished goods back from it, with no order or bill of
+      // materials in between.
+      {
+        id: `ot_${wh.code.toLowerCase()}_mo_issue`,
+        code: `${wh.code}/PROD-OUT`,
+        name: `${wh.code}: Issue to Production`,
+        kind: "production_issue",
+        warehouseId: wh.id,
+        sequencePrefix: `${wh.code}/PRD-OUT/`,
+        defaultDestId: "loc_production",
+      },
+      {
+        id: `ot_${wh.code.toLowerCase()}_mo_receipt`,
+        code: `${wh.code}/PROD-IN`,
+        name: `${wh.code}: Receive from Production`,
+        kind: "production_receipt",
+        warehouseId: wh.id,
+        sequencePrefix: `${wh.code}/PRD-IN/`,
+        defaultSourceId: "loc_production",
       },
       {
         id: `ot_${wh.code.toLowerCase()}_int`,
@@ -540,23 +589,25 @@ export function buildDataset(): Dataset {
   let palletSeq = 0;
   let quantSeq = 0;
 
-  const cellsByWarehouse = new Map<string, Location[]>();
+  // Stock is generated per section: the two sections hold different material
+  // groups and run at different occupancies.
+  const cellsBySection = new Map<string, Location[]>();
   for (const loc of locations) {
-    if (loc.kind !== "cell" || !loc.warehouseId) continue;
-    const list = cellsByWarehouse.get(loc.warehouseId) ?? [];
+    if (loc.kind !== "cell" || !loc.zoneId) continue;
+    const list = cellsBySection.get(loc.zoneId) ?? [];
     list.push(loc);
-    cellsByWarehouse.set(loc.warehouseId, list);
+    cellsBySection.set(loc.zoneId, list);
   }
 
   /** Pallets that hold stock, kept for later history generation. */
   const storedPallets: StoredPallet[] = [];
-  /** Positions left free per warehouse, used to target pending put-aways. */
-  const freeCellsByWarehouse = new Map<string, Location[]>();
+  /** Positions left free per section, used to target pending put-aways. */
+  const freeCellsBySection = new Map<string, Location[]>();
 
-  for (const wh of warehouses) {
-    const cells = cellsByWarehouse.get(wh.id) ?? [];
+  for (const section of zones) {
+    const cells = cellsBySection.get(section.id) ?? [];
     const free = cells.filter((c) => !c.blocked);
-    const target = Math.round(free.length * OCCUPANCY_TARGET[wh.id]);
+    const target = Math.round(free.length * (OCCUPANCY_TARGET[section.id] ?? 0.6));
     // Occupancy is not uniform: lower bays and mid-levels fill first, which is
     // what a real VNA warehouse looks like and makes the heat maps readable.
     const scored = free
@@ -569,9 +620,9 @@ export function buildDataset(): Dataset {
       .map((s) => s.cell);
 
     const chosen = scored.slice(0, target);
-    freeCellsByWarehouse.set(wh.id, scored.slice(target));
+    freeCellsBySection.set(section.id, scored.slice(target));
     const groupProducts = PRODUCTS.filter((p) =>
-      wh.materialGroups.includes(p.materialGroup),
+      section.materialGroups.includes(p.materialGroup),
     );
 
     for (const cell of chosen) {
@@ -619,7 +670,13 @@ export function buildDataset(): Dataset {
       };
       quants.push(quant);
       pallet.createdAt = lot.receiptDate;
-      storedPallets.push({ pallet, quant, lot, warehouseId: wh.id });
+      storedPallets.push({
+        pallet,
+        quant,
+        lot,
+        warehouseId: WAREHOUSE.id,
+        sectionId: section.id,
+      });
     }
   }
 
@@ -627,10 +684,10 @@ export function buildDataset(): Dataset {
   // area and each has a Ready put-away claiming a specific empty position, so
   // "reserved for incoming" is real state rather than a decorative label.
   const inboundPallets: StoredPallet[] = [];
-  for (const wh of warehouses) {
-    const inLocationId = `loc_${wh.code.toLowerCase()}_in`;
+  for (const section of zones) {
+    const inLocationId = `loc_${WAREHOUSE.code.toLowerCase()}_in`;
     const groupProducts = PRODUCTS.filter((p) =>
-      wh.materialGroups.includes(p.materialGroup),
+      section.materialGroups.includes(p.materialGroup),
     );
     const count = rng.int(6, 11);
     for (let i = 0; i < count; i++) {
@@ -694,7 +751,13 @@ export function buildDataset(): Dataset {
         inDate: receiptDate,
       };
       quants.push(quant);
-      inboundPallets.push({ pallet, quant, lot, warehouseId: wh.id });
+      inboundPallets.push({
+        pallet,
+        quant,
+        lot,
+        warehouseId: WAREHOUSE.id,
+        sectionId: section.id,
+      });
     }
   }
 
@@ -720,7 +783,7 @@ export function buildDataset(): Dataset {
     locations,
     storedPallets,
     inboundPallets,
-    freeCellsByWarehouse,
+    freeCellsBySection,
     quants,
     pallets,
   });
@@ -758,6 +821,8 @@ interface StoredPallet {
   quant: Quant;
   lot: Lot;
   warehouseId: string;
+  /** Which section of the building the pallet belongs to. */
+  sectionId: string;
 }
 
 interface OpBuildArgs {
@@ -769,7 +834,7 @@ interface OpBuildArgs {
   locations: Location[];
   storedPallets: StoredPallet[];
   inboundPallets: StoredPallet[];
-  freeCellsByWarehouse: Map<string, Location[]>;
+  freeCellsBySection: Map<string, Location[]>;
   quants: Quant[];
   pallets: Pallet[];
 }
@@ -1034,6 +1099,118 @@ function buildOperations(args: OpBuildArgs): {
     });
   }
 
+  // ---- 2b. the production flow ------------------------------------------
+  //
+  // Raw material and packing material are issued out of the Raw section to a
+  // virtual production location; finished goods come back from it into the FG
+  // section. Manufacturing itself is out of scope - there is no order and no
+  // bill of materials - but the warehouse still has to show stock leaving one
+  // section and arriving in the other, because that is what an operator sees.
+  for (const wh of args.warehouses) {
+    const rawPool = args.storedPallets.filter(
+      (entry) => entry.sectionId === "sec_raw",
+    );
+    const fgPool = args.storedPallets.filter(
+      (entry) => entry.sectionId === "sec_fg",
+    );
+    if (!rawPool.length || !fgPool.length) continue;
+
+    const issueType = typeFor(wh.id, "production_issue");
+    const receiptType = typeFor(wh.id, "production_receipt");
+    const runs = Math.max(6, Math.round(rawPool.length * 0.05));
+
+    for (let i = 0; i < runs; i++) {
+      const daysAgo = rng.int(1, HISTORY_DAYS);
+      const at = addHours(addDays(now, -daysAgo), rng.int(6, 16));
+      const operator = rng.pick(operators);
+      const batchRef = `PRD/${at.getUTCFullYear()}/${pad(rng.int(1, 9999), 4)}`;
+
+      // --- issue raw material out of the Raw section
+      const consumed = rng.shuffle(rawPool).slice(0, rng.int(1, 3));
+      const issue = addOperation({
+        typeId: issueType.id,
+        kind: "production_issue",
+        state: "done",
+        warehouseId: wh.id,
+        sourceLocationId: consumed[0].pallet.locationId!,
+        destLocationId: "loc_production",
+        operatorId: operator.id,
+        sourceDocument: batchRef,
+        scheduledAt: at.toISOString(),
+        createdAt: addHours(at, -rng.int(2, 12)).toISOString(),
+        effectiveAt: at.toISOString(),
+        note: "Raw material issued to production. Production itself is outside the scope of this prototype.",
+      });
+
+      for (const entry of consumed) {
+        const qty =
+          Math.round(entry.quant.quantity * (0.3 + rng.float() * 0.6) * 100) / 100;
+        const move = addMove(issue, {
+          productId: entry.quant.productId,
+          variantId: entry.quant.variantId,
+          uom: entry.quant.uom,
+          demandQty: qty,
+          doneQty: qty,
+          sourceLocationId: entry.pallet.locationId!,
+          destLocationId: "loc_production",
+        });
+        addLine(issue, move, {
+          lotId: entry.lot.id,
+          quantity: qty,
+          doneQty: qty,
+          sourceLocationId: entry.pallet.locationId!,
+          destLocationId: "loc_production",
+          sourcePalletId: entry.pallet.id,
+          destPalletId: null,
+          doneAt: at.toISOString(),
+        });
+      }
+
+      // --- receive finished goods back into the FG section
+      const producedAt = addHours(at, rng.int(4, 30));
+      if (producedAt > now) continue;
+      const produced = rng.shuffle(fgPool).slice(0, rng.int(1, 2));
+      const receipt = addOperation({
+        typeId: receiptType.id,
+        kind: "production_receipt",
+        state: "done",
+        warehouseId: wh.id,
+        sourceLocationId: "loc_production",
+        destLocationId: produced[0].pallet.locationId!,
+        operatorId: rng.pick(operators).id,
+        sourceDocument: batchRef,
+        scheduledAt: producedAt.toISOString(),
+        createdAt: at.toISOString(),
+        effectiveAt: producedAt.toISOString(),
+        originOperationId: issue.id,
+        note: "Finished goods received from production into the FG section.",
+      });
+
+      for (const entry of produced) {
+        const dest = entry.pallet.locationId!;
+        const move = addMove(receipt, {
+          productId: entry.quant.productId,
+          variantId: entry.quant.variantId,
+          uom: entry.quant.uom,
+          demandQty: entry.quant.quantity,
+          doneQty: entry.quant.quantity,
+          sourceLocationId: "loc_production",
+          destLocationId: dest,
+        });
+        addLine(receipt, move, {
+          lotId: entry.lot.id,
+          quantity: entry.quant.quantity,
+          doneQty: entry.quant.quantity,
+          sourceLocationId: "loc_production",
+          destLocationId: dest,
+          sourcePalletId: null,
+          destPalletId: entry.pallet.id,
+          doneAt: producedAt.toISOString(),
+        });
+      }
+    }
+  }
+
   // ---- 3. historical picks and deliveries -------------------------------
   for (const wh of warehouses) {
     const pool = args.storedPallets.filter((p) => p.warehouseId === wh.id);
@@ -1198,15 +1375,24 @@ function buildOperations(args: OpBuildArgs): {
       });
     }
 
-    // One Ready put-away per pallet, each claiming a distinct empty position.
-    const freeCells = rng.shuffle(args.freeCellsByWarehouse.get(wh.id) ?? []);
-    let cellCursor = 0;
+    // One Ready put-away per pallet, each claiming a distinct empty position
+    // in the section that pallet belongs to - raw stock does not get put away
+    // into finished-goods racking.
+    const freeBySection = new Map<string, Location[]>();
+    for (const [sectionId, list] of args.freeCellsBySection) {
+      freeBySection.set(sectionId, rng.shuffle(list));
+    }
+    const cursorBySection = new Map<string, number>();
+
     for (const entry of entries) {
+      const pool = freeBySection.get(entry.sectionId) ?? [];
+      let cellCursor = cursorBySection.get(entry.sectionId) ?? 0;
       let dest: Location | undefined;
-      while (cellCursor < freeCells.length && !dest) {
-        const candidate = freeCells[cellCursor++];
+      while (cellCursor < pool.length && !dest) {
+        const candidate: Location = pool[cellCursor++];
         if (!candidate.blocked) dest = candidate;
       }
+      cursorBySection.set(entry.sectionId, cellCursor);
       if (!dest) break;
 
       const putAt = addHours(now, rng.int(1, 20)).toISOString();

@@ -34,7 +34,7 @@ import { CellPreview } from "@/map/CellPreview";
 import { FloorPlan, occupancyColor } from "@/map/FloorPlan";
 import { ElevationLegend, RackElevation } from "@/map/RackElevation";
 import { VISUAL_LEGEND, type CellVisual } from "@/map/warehouse3dGeometry";
-import { useDerived } from "@/store/appStore";
+import { useAppStore, useDerived } from "@/store/appStore";
 
 /** three.js is ~400 kB; it must not sit in the main presentation bundle. */
 const Warehouse3D = lazy(() =>
@@ -94,6 +94,8 @@ function OccupancyBody({
   const [visParam, setVisParam] = useUrlParam("vis");
   const is3D = view === "3d";
   const rackById = useDerived().index.rackById;
+  /** The two sections of the building, in flow order: raw, then finished. */
+  const sections = useAppStore((st) => st.data.zones);
 
   /** Occupancy categories shown in the 3D view; empty means show everything. */
   const visibleVisuals = useMemo(() => {
@@ -230,15 +232,15 @@ function OccupancyBody({
 
       <PanelGrid>
         <ChartCard
-          title="Occupancy comparison by warehouse"
-          hint="Occupied, empty, blocked and reserved positions per warehouse."
+          title="Occupancy comparison by section"
+          hint="Occupied, empty, blocked and reserved positions in each section of the building."
           height={230}
-          footer="Select a warehouse bar to load its floor plan below."
+          footer="Raw material is held in the Raw section and issued to production; finished goods come back into the FG section and leave from there."
         >
           <WarehouseComparison
             rows={rows.cells}
-            warehouses={warehouses.map((w) => ({ id: w.id, code: w.code }))}
-            onSelect={(id) => setParams({ wh: id, rack: null, cell: null })}
+            warehouses={sections.map((z) => ({ id: z.id, code: z.code }))}
+            onSelect={(id) => setParams({ section: id, rack: null, cell: null })}
           />
         </ChartCard>
 
@@ -515,19 +517,21 @@ function WarehouseSummary({
 
 // ------------------------------------------------------------------ charts
 
+/** Compares the two sections of the building. */
 function WarehouseComparison({
   rows,
   warehouses,
   onSelect,
 }: {
   rows: CellRow[];
+  /** The sections to compare. */
   warehouses: { id: string; code: string }[];
   onSelect: (id: string) => void;
 }) {
   const data = useMemo(
     () =>
       warehouses.map((w) => {
-        const list = rows.filter((c) => c.warehouseId === w.id);
+        const list = rows.filter((c) => c.sectionId === w.id);
         return {
           id: w.id,
           label: w.code,

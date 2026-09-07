@@ -9,7 +9,7 @@
 
 import { DEMO_NOW_ISO } from "./clock";
 import type { DerivedRows } from "./derive";
-import { WAREHOUSE_SPECS, TOTAL_DECLARED_POSITIONS } from "./layout";
+import { WAREHOUSE, TOTAL_DECLARED_POSITIONS } from "./layout";
 import type { Dataset } from "./types";
 
 export interface CheckResult {
@@ -27,16 +27,24 @@ export function runIntegrityChecks(
 ): CheckResult[] {
   const results: CheckResult[] = [];
 
-  // 1. Installed positions must match the MinMax capacity tables exactly.
-  for (const spec of WAREHOUSE_SPECS) {
-    const built = derived.cells.filter((c) => c.warehouseId === spec.id).length;
+  // 1. Installed positions must match the MinMax capacity table exactly, both
+  //    per section and for the building as a whole.
+  for (const section of WAREHOUSE.sections) {
+    const declared = section.groups.reduce((sum, g) => sum + g.declaredPositions, 0);
+    const built = derived.cells.filter((c) => c.sectionId === section.id).length;
     results.push({
-      id: `positions_${spec.code}`,
-      label: `${spec.code} installed positions match the drawing`,
-      ok: built === spec.declaredPositions,
-      detail: `${built} generated vs ${spec.declaredPositions} declared on ${spec.sheet}`,
+      id: `positions_${section.code}`,
+      label: `${section.name} installed positions match the layout`,
+      ok: built === declared,
+      detail: `${built} generated vs ${declared} allocated to this section`,
     });
   }
+  results.push({
+    id: "positions_building",
+    label: "Building total matches the drawing",
+    ok: derived.cells.length === WAREHOUSE.declaredPositions,
+    detail: `${derived.cells.length} generated vs ${WAREHOUSE.declaredPositions} declared on ${WAREHOUSE.sheet}`,
+  });
 
   const totalPositions = derived.cells.length;
   results.push({

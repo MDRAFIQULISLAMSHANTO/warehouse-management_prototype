@@ -211,9 +211,9 @@ function StockVisibilityBody({
 
       <PanelGrid>
         <ChartCard
-          title={`Stock by warehouse (${activeUnit})`}
-          hint="On-hand quantity per warehouse, split by material group."
-          footer="Select a bar to open the stock lines for that warehouse."
+          title={`Stock by section (${activeUnit})`}
+          hint="On-hand quantity in each section of the building, split by material group."
+          footer="Select a bar to open the stock lines for that section."
         >
           <WarehouseChart rows={inUnit} unit={activeUnit} drill={drill} />
         </ChartCard>
@@ -230,7 +230,7 @@ function StockVisibilityBody({
       <PanelGrid>
         <ChartCard
           title={`Availability analysis (${activeUnit})`}
-          hint="Available versus reserved quantity per warehouse."
+          hint="Available versus reserved quantity in each section."
           height={260}
           footer="Reserved plus available equals on hand. Reservations never reduce on-hand quantity."
         >
@@ -366,7 +366,7 @@ function WarehouseChart({
       { label: string; RM: number; FG: number; PM: number }
     >();
     for (const row of rows) {
-      const key = row.warehouseCode ?? "-";
+      const key = row.sectionCode || "-";
       const entry =
         byWarehouse.get(key) ?? { label: key, RM: 0, FG: 0, PM: 0 };
       entry[row.materialGroup] += row.quantity;
@@ -405,9 +405,9 @@ function WarehouseChart({
                 model: "stock",
                 facets: [
                   contextFacet(
-                    "Warehouse",
+                    "Section",
                     [datum.label],
-                    cond("warehouseCode", "eq", datum.label),
+                    cond("sectionCode", "eq", datum.label),
                   ),
                   contextFacet(
                     "Material Group",
@@ -486,7 +486,7 @@ function AvailabilityChart({
   const data = useMemo(() => {
     const byWarehouse = new Map<string, { label: string; available: number; reserved: number }>();
     for (const row of rows) {
-      const key = row.warehouseCode ?? "-";
+      const key = row.sectionCode || "-";
       const entry = byWarehouse.get(key) ?? { label: key, available: 0, reserved: 0 };
       entry.available += row.availableQuantity;
       entry.reserved += row.reservedQuantity;
@@ -524,9 +524,9 @@ function AvailabilityChart({
                 model: "stock",
                 facets: [
                   contextFacet(
-                    "Warehouse",
+                    "Section",
                     [datum.label],
-                    cond("warehouseCode", "eq", datum.label),
+                    cond("sectionCode", "eq", datum.label),
                   ),
                   contextFacet(series.name, ["> 0"], cond(series.field, "gt", 0)),
                 ],

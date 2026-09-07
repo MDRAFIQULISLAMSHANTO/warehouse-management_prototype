@@ -33,7 +33,7 @@ import { CLICKABLE, payloadOf, useDrilldown, type DrilldownFn } from "./useDrill
 import type { Facet } from "@/query/search";
 
 const GROUP_LABEL: Record<string, string> = {
-  warehouseCode: "Warehouse",
+  sectionCode: "Section",
   productName: "Product",
   aisleCode: "Aisle",
 };
@@ -206,11 +206,11 @@ function PartialBody({
         </ChartCard>
 
         <ChartCard
-          title="Partial pallets by warehouse"
+          title="Partial pallets by section"
           hint="Where the part loads are."
           height={240}
         >
-          <GroupChart drill={drill} rows={partials} field="warehouseCode" />
+          <GroupChart drill={drill} rows={partials} field="sectionCode" />
         </ChartCard>
       </PanelGrid>
 
@@ -292,7 +292,7 @@ function GroupChart({
   drill,
 }: {
   rows: PalletRow[];
-  field: "warehouseCode" | "productName" | "aisleCode";
+  field: "sectionCode" | "productName" | "aisleCode";
   limit?: number;
   horizontal?: boolean;
   drill: DrilldownFn;
