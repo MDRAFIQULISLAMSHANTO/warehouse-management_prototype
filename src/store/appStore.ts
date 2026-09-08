@@ -122,7 +122,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return result;
     }
     const log = [...state.log, action];
-    set({ log, version: state.version + 1, data: state.data });
+    // applyAction mutates the dataset in place, so `data` keeps its identity
+    // and every `useMemo` keyed on a nested array - `[data.moveLines]` and the
+    // like - would never recompute. That is what made a validated Check
+    // Availability look like it had done nothing: the status updated (it comes
+    // from `derived`, which is keyed on `version`) while the lines table went
+    // on showing zero reserved. Re-wrapping the collections gives them fresh
+    // identities; the element objects are untouched, so aliases held elsewhere
+    // still point at the same records.
+    const next: Dataset = {
+      ...state.data,
+      operations: [...state.data.operations],
+      moves: [...state.data.moves],
+      moveLines: [...state.data.moveLines],
+      reservations: [...state.data.reservations],
+      quants: [...state.data.quants],
+      pallets: [...state.data.pallets],
+      lots: [...state.data.lots],
+      locations: [...state.data.locations],
+    };
+    set({ log, version: state.version + 1, data: next });
     savePersisted({
       seedVersion: SEED_VERSION,
       log,

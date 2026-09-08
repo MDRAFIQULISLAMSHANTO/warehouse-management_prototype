@@ -180,5 +180,40 @@ export function runIntegrityChecks(
       : `${claims.size} pending destination(s) checked`,
   });
 
+  // 11. "Ready" has to mean something: an operation is only Ready when its
+  //     whole demand is actually reserved. A Ready operation with nothing
+  //     reserved is not just a wrong label - it strands the operator, because
+  //     there is nothing left to reserve and nothing to validate.
+  const reservedByLine = new Map<string, number>();
+  for (const reservation of data.reservations) {
+    reservedByLine.set(
+      reservation.moveLineId,
+      (reservedByLine.get(reservation.moveLineId) ?? 0) + reservation.quantity,
+    );
+  }
+
+  const badReady = data.operations.filter((op) => {
+    if (op.state !== "ready") return false;
+    const demand = data.moves
+      .filter((m) => m.operationId === op.id)
+      .reduce((sum, m) => sum + m.demandQty, 0);
+    const reserved = data.moveLines
+      .filter((l) => l.operationId === op.id)
+      .reduce((sum, l) => sum + (reservedByLine.get(l.id) ?? 0), 0);
+    return reserved < demand - 0.01;
+  });
+
+  results.push({
+    id: "ready_means_reserved",
+    label: "Every Ready operation has its demand reserved",
+    ok: badReady.length === 0,
+    detail: badReady.length
+      ? `${badReady.length} operation(s) marked Ready with unreserved demand, e.g. ${badReady
+          .slice(0, 3)
+          .map((op) => op.name)
+          .join(", ")}`
+      : `${data.operations.filter((op) => op.state === "ready").length} Ready operation(s) fully reserved`,
+  });
+
   return results;
 }

@@ -80,14 +80,32 @@ export function OperationDetail() {
       .filter((r) => r.moveLineId === lineId)
       .reduce((s, r) => s + r.quantity, 0);
 
+  /**
+   * Which buttons to offer is decided from the operation's own numbers, not
+   * from its state label.
+   *
+   * Deciding from the label alone stranded operations: Check Availability was
+   * hidden whenever the state read "Ready", and Validate was hidden whenever
+   * there were no detailed operations, so anything marked Ready with nothing
+   * reserved offered neither button and could not be progressed at all.
+   */
+  const totalDemand = moves.reduce((sum, m) => sum + m.demandQty, 0);
+  const totalReserved = lines.reduce((sum, l) => sum + reservedFor(l.id), 0);
+  const hasUnreservedDemand = totalReserved < totalDemand - 0.0001;
+
   const actions = (
     <>
-      {isOpen && raw.state !== "ready" && (
+      {isOpen && hasUnreservedDemand && (
         <button
           type="button"
           className="o-btn o-btn-primary"
           onClick={() =>
             dispatch({ type: "check_availability", operationId: id, at: DEMO_NOW_ISO })
+          }
+          title={
+            lines.length === 0
+              ? "Find stock for this demand and reserve it."
+              : "Try to reserve the demand that is still unreserved."
           }
         >
           Check Availability

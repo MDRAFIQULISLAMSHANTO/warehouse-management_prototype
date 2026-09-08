@@ -63,7 +63,25 @@ const PACKAGING_SUPPLIERS: Partner[] = SUPPLIERS.filter(
   (p) => p.ref === "SUP-005" || p.ref === "SUP-006",
 );
 
-export const SEED_VERSION = "1.0.0";
+/**
+ * Identifies the shape of the dataset, not the code version.
+ *
+ * The store persists an action log and replays it on load; a log recorded
+ * against a different dataset would replay ids that no longer exist and leave
+ * operations in impossible states - a Ready pick with nothing reserved, for
+ * instance. The guard that discards a stale log is only as good as this string,
+ * and a hand-maintained "1.0.0" silently went stale through a restructure that
+ * renamed every warehouse, section, aisle and cell. So it is derived from the
+ * layout itself: change the building and old logs invalidate automatically.
+ */
+export const SEED_VERSION = [
+  "2",
+  WAREHOUSE.id,
+  WAREHOUSE.declaredPositions,
+  WAREHOUSE.sections
+    .map((x) => `${x.id}:${x.groups.reduce((sum, g) => sum + g.bays, 0)}`)
+    .join("+"),
+].join("-");
 const SEED = 20260906;
 
 /**
