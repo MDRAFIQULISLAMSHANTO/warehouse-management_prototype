@@ -92,19 +92,70 @@ export const MENUS: TopMenu[] = [
     label: "Operations",
     sections: [
       {
-        title: "Transfers",
         entries: [
           { label: "All Operations", to: "/operations" },
-          { label: "Receipts", to: "/operations?preset=receipts" },
-          { label: "Put-Away", to: "/operations?preset=putaway" },
-          { label: "Internal Transfers", to: "/operations?preset=internal" },
-          { label: "Picks", to: "/operations?preset=pick" },
-          { label: "Deliveries", to: "/operations?preset=delivery" },
+          {
+            label: "To Process",
+            to: "/operations?preset=todo",
+            hint: "Everything not yet completed: draft, waiting and ready.",
+          },
         ],
       },
       {
-        title: "History",
-        entries: [{ label: "Inventory Movements", to: "/movements" }],
+        title: "Inbound",
+        entries: [
+          {
+            label: "Receipts",
+            to: "/operations?preset=receipts",
+            hint: "Goods arriving from a supplier into the input area.",
+          },
+          {
+            label: "Put-Away",
+            to: "/operations?preset=putaway",
+            hint: "Moving received pallets from the input area into a rack position.",
+          },
+        ],
+      },
+      {
+        title: "Outbound",
+        entries: [
+          {
+            label: "Picks",
+            to: "/operations?preset=pick",
+            hint: "Taking stock out of a rack position to the dispatch staging area.",
+          },
+          {
+            label: "Deliveries",
+            to: "/operations?preset=delivery",
+            hint: "Dispatching staged goods to the customer.",
+          },
+        ],
+      },
+      {
+        title: "Production",
+        entries: [
+          {
+            label: "Issue to Production",
+            to: "/operations?preset=prod_issue",
+            hint: "Raw material and packing material leaving the Raw section for production.",
+          },
+          {
+            label: "Receive from Production",
+            to: "/operations?preset=prod_receipt",
+            hint: "Finished goods coming back from production into the FG section.",
+          },
+        ],
+      },
+      {
+        title: "Internal and history",
+        entries: [
+          {
+            label: "Internal Transfers",
+            to: "/operations?preset=internal",
+            hint: "Moving a pallet between positions inside the building.",
+          },
+          { label: "Inventory Movements", to: "/movements" },
+        ],
       },
     ],
   },
