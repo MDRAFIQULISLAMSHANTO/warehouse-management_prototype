@@ -152,7 +152,7 @@ export function buildDataset(): Dataset {
   const sites: Site[] = [
     {
       id: "site_main",
-      name: "Ispahani Tea - Warehouse Site",
+      name: "Warehouse Site",
       drawingRef: WAREHOUSE.drawingRef,
     },
   ];

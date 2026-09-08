@@ -168,7 +168,7 @@ Use **Reset Demo** to return to these.
 ## Presenting honestly
 
 - All stock, lots, pallets, operators and partners are illustrative demonstration
-  data, **not Ispahani records**.
+  data, **not real warehouse records**.
 - Capacity comes from the MinMax drawing and reconciles with it exactly. The
   split of the 219 bays between the two sections is **assumed** and needs
   confirming. Floor-plan geometry is schematic.

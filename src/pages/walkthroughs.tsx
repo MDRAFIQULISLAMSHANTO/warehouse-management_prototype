@@ -70,7 +70,7 @@ const MANAGEMENT: Step[] = [
   {
     title: "Close on traceability and honesty",
     detail:
-      "Inventory by Lot walks one lot from receipt to its current pallets and positions. Then show the assumptions page: what came from the drawing, what is provisional, and what still needs Ispahani's confirmation - starting with how the 219 bays split between the two sections.",
+      "Inventory by Lot walks one lot from receipt to its current pallets and positions. Then show the assumptions page: what came from the drawing, what is provisional, and what still needs the client's confirmation - starting with how the 219 bays split between the two sections.",
     to: "/about/assumptions",
     linkLabel: "Source Drawing Assumptions",
   },
@@ -308,7 +308,7 @@ export function WalkthroughsPage() {
           <ul className="list-disc pl-5 mb-0">
             <li>
               All stock, lots, pallets, operators and partners are illustrative
-              demonstration data, not Ispahani records.
+              demonstration data, not real warehouse records.
             </li>
             <li>
               Warehouse capacities come from the MinMax drawings and reconcile with

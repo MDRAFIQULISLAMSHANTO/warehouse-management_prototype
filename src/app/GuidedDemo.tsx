@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { JOURNEYS } from "@/pages/walkthroughs";
 import { IconChevronLeft, IconChevronRight, IconClose } from "@/odoo/icons";
 
-const STORAGE_KEY = "ispahani-wms.guided.open";
+const STORAGE_KEY = "wms.guided.open";
 
 export function GuidedDemo() {
   const [open, setOpen] = useState(() => {

@@ -3,7 +3,7 @@
  *
  * ILLUSTRATIVE DEMO DATA. Product codes, pallet quantities, garden marks,
  * suppliers, customers and operator names below are plausible stand-ins built
- * for the presentation. They are NOT Ispahani master data and must not be
+ * for the presentation. They are NOT real master data and must not be
  * presented as such. In the real project this master data arrives in Odoo from
  * the client, loaded by the partner handling product setup and opening
  * balances (SRS 1.2).

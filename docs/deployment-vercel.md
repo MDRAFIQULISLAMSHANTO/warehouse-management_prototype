@@ -30,7 +30,7 @@ the client. **Deep links and detail-page refreshes therefore work in production.
 npm i -g vercel        # once
 vercel login
 
-cd ispahani-wms
+cd warehouse-management_prototype
 vercel                 # preview deployment
 vercel --prod          # production deployment
 ```
@@ -42,8 +42,8 @@ from `vercel.json`.
 
 1. Push this directory to a Git repository.
 2. In the Vercel dashboard: **Add New → Project**, import the repository.
-3. If the repository root is not `ispahani-wms`, set **Root Directory** to
-   `ispahani-wms`.
+3. Leave **Root Directory** at the repository root — `package.json` and
+   `vercel.json` both sit there.
 4. Leave Framework Preset as **Vite**. Build command `npm run build`, output
    directory `dist` — both already in `vercel.json`.
 5. Deploy. Every push produces a preview URL; the default branch produces

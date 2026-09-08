@@ -1,5 +1,5 @@
 /**
- * Domain types for the Ispahani WMS prototype.
+ * Domain types for the WMS prototype.
  *
  * Naming deliberately tracks Odoo Inventory so the client sees the same words
  * they will see in Odoo 19: location, quant, package (pallet), lot, picking

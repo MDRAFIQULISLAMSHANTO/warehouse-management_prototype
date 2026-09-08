@@ -167,7 +167,7 @@ export function OperatorsPage() {
   return (
     <ConfigPage
       title="Operators"
-      description="Warehouse users recorded against operations. Illustrative names for the demonstration - not Ispahani staff records."
+      description="Warehouse users recorded against operations. Illustrative names for the demonstration - not real staff records."
     >
       <table className="o-list">
         <thead>

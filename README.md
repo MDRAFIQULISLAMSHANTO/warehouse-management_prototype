@@ -1,10 +1,10 @@
-# Ispahani Warehouse Management — Presales Prototype
+# Warehouse Management System — Presales Prototype
 
 A fully interactive frontend prototype of a **Warehouse Location and Pallet
-Management System**, presented by **Invento Software Limited** to **Ispahani Tea
-Limited**. The proposed production platform is **Odoo 19 Enterprise**; this
-prototype reproduces that interface and drives it with a deterministic dataset
-built from Ispahani's own MinMax rack drawings.
+Management System**, presented by **Invento Software Limited**. The proposed
+production platform is **Odoo 19 Enterprise**; this prototype reproduces that
+interface and drives it with a deterministic dataset built from the client's own
+MinMax rack drawings.
 
 > **This is a demonstration, not a system of record.** All stock, lots, pallets,
 > operators, suppliers and customers are generated illustrative data. Warehouse
@@ -266,7 +266,7 @@ pallet identification remains required and is implemented.
 
 ---
 
-## Open questions for Ispahani
+## Open questions for the client
 
 1. **Is "WH-2" (Job 2579) the same building as "Raw Tea Warehouse-2" (Job 2304)?**
    They are modelled as two distinct warehouses. If they are the same building,
@@ -281,7 +281,7 @@ pallet identification remains required and is implemented.
 
 ## Honest limits
 
-- Sample stock is illustrative and must never be presented as Ispahani data.
+- Sample stock is illustrative and must never be presented as real customer data.
 - Floor plans are schematic, not traced from the drawing geometry.
 - No accuracy percentage, saving or ROI can be claimed from this prototype.
 - The interactive maps, occupancy colouring, empty-cell categorisation and

@@ -95,7 +95,7 @@ looser needs a business decision about mixing lots on one pallet.
 
 - **Two-step inbound** (receipt into an input area, then put-away) and
   **two-step outbound** (pick to output, then delivery) are used throughout.
-  Whether Ispahani wants one-step or two-step routing is a configuration
+  Whether the client wants one-step or two-step routing is a configuration
   decision.
 - Purchase, Sales, Accounting and Manufacturing are outside this prototype's
   scope. Operations therefore start from warehouse documents carrying a

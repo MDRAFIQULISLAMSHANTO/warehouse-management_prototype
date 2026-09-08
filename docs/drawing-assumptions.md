@@ -5,7 +5,7 @@ place this prototype had to assume something.
 
 Also available in the application at `/about/assumptions`.
 
-## Structure, as confirmed by Ispahani
+## Structure, as confirmed by the client
 
 There is **one warehouse**, divided into **two sections**:
 
@@ -25,7 +25,7 @@ production from the warehouse side.
 
 | Document | What it provided |
 |---|---|
-| `SRS_Ispahani_Warehouse_Pallet_Management.pdf` (6 pp) | Requirements, hierarchy, scope, acceptance criteria |
+| Warehouse Pallet Management SRS (6 pp) | Requirements, hierarchy, scope, acceptance criteria |
 | `WH-2Job 2579-180825-Revise 2-OP 2.pdf` (3 pp) | **The warehouse modelled here.** MinMax Job 2579-180825, Revise 2 dated 10.02.26, for the building drawn as 203' × 79'-8" |
 | `Job 2304 241225-Revise 10-Up3.pdf` (6 pp) | MinMax Job 2304-24122024, Revise 10 dated 29.09.25. **Superseded** — see below |
 
@@ -37,7 +37,7 @@ environment, so no drawing geometry could be traced.
 Job 2304 carries three separate storage-capacity tables — a Raw Tea Warehouse-2
 at 1,325 positions, an FG Warehouse at 825, and an untitled R5/R6 area at 548.
 Job 2579 is the **later** drawing (10.02.26 against 29.09.25) and describes the
-building that is actually being fitted out. Ispahani confirmed that Job 2579 is
+building that is actually being fitted out. The client confirmed that Job 2579 is
 the warehouse, so the Job 2304 tables describe a superseded scheme and are not
 part of the model. Nothing from them contributes to any figure in this
 prototype.
@@ -93,7 +93,7 @@ bays). If a decoded total ever stopped matching a printed total the application
 would refuse to load rather than show a number that disagrees with the client's
 own capacity table.
 
-## Open questions requiring Ispahani confirmation
+## Open questions requiring client confirmation
 
 1. **How are the 219 bays actually split between the two sections?** The drawing
    gives one capacity table for the whole building and does not say which racking
@@ -103,7 +103,7 @@ own capacity table.
    earlier Job 2304 scheme used. **This is the single most important number to
    confirm**, because it sets the capacity of each section.
 2. **Should packing material have its own section?** PM currently shares the Raw
-   section, because it is also an input to production. If Ispahani keeps it
+   section, because it is also an input to production. If the client keeps it
    separately, it needs a third section or a sub-zone.
 3. **Aisle naming and rack numbering.** The drawing shows rack lines but the
    extracted text carries no aisle labelling. Aisle codes (`RAW-A1`, `FG-A1` …)
@@ -136,7 +136,7 @@ totals.
 
 Products, variants, lots, garden marks, suppliers, customers, operators,
 quantities and movements are generated for the demonstration. They are plausible
-for a tea business but they are **not** Ispahani master data or stock, and must
+for a tea business but they are **not** real master data or stock, and must
 never be presented as such.
 
 In the real project this master data and the opening balances arrive in Odoo from

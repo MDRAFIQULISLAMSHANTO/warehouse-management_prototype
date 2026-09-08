@@ -1,9 +1,9 @@
 {
-  "name": "ispahani-wms",
+  "name": "warehouse-management-system",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Ispahani Warehouse Management - presales prototype by Invento Software Limited",
+  "description": "Warehouse Management System - presales prototype by Invento Software Limited",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,6 +1,6 @@
 # Requirements Coverage Matrix
 
-Every retained requirement from `SRS_Ispahani_Warehouse_Pallet_Management.pdf`,
+Every retained requirement from the supplied Warehouse Pallet Management SRS,
 mapped to the screen that demonstrates it. Also available live in the application
 at `/about/requirements`.
 

@@ -15,7 +15,7 @@ import type { Dataset, FavoriteRecord } from "@/data/types";
 import type { ActionResult, DemoAction } from "./actions";
 import { applyAction, resetIdCounter } from "./apply";
 
-const STORAGE_KEY = "ispahani-wms.demo.v1";
+const STORAGE_KEY = "wms.demo.v1";
 
 export interface Notification {
   id: number;

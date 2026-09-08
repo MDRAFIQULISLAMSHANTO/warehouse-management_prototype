@@ -531,7 +531,7 @@ export function AssumptionsPage() {
       <H>Documents used</H>
       <ul className="list-disc pl-5">
         <li>
-          <strong>SRS_Ispahani_Warehouse_Pallet_Management.pdf</strong> - 6 pages,
+          <strong>the supplied Warehouse Pallet Management SRS</strong> - 6 pages,
           the requirement source.
         </li>
         <li>
@@ -614,7 +614,7 @@ export function AssumptionsPage() {
         </tbody>
       </table>
 
-      <H>Open questions requiring Ispahani confirmation</H>
+      <H>Open questions requiring client confirmation</H>
       <ol className="list-decimal pl-5">
         <li className="mb-2">
           <strong>Is "WH-2" (Job 2579) the same building as "Raw Tea Warehouse-2" (Job 2304)?</strong>{" "}
@@ -643,7 +643,7 @@ export function AssumptionsPage() {
         <li>
           <strong>Receipt and delivery routing.</strong> A two-step inbound
           (receipt into an input area, then put-away) and two-step outbound (pick to
-          output, then delivery) are used. Whether Ispahani wants one-step or
+          output, then delivery) are used. Whether the client wants one-step or
           two-step routing is a configuration decision awaiting confirmation.
         </li>
       </ol>
@@ -662,7 +662,7 @@ export function AssumptionsPage() {
       <p className="mb-0">
         Products, variants, lots, garden marks, suppliers, customers, operators,
         quantities and movements are generated for the demonstration. They are
-        plausible for a tea business but they are <strong>not</strong> Ispahani
+        plausible for a tea business but they are <strong>not</strong> real
         master data or stock, and must never be presented as such. In the real
         project this master data and the opening balances arrive in Odoo from the
         client, loaded by the partner handling product setup (SRS 1.2).

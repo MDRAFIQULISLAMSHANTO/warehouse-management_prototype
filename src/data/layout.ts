@@ -5,7 +5,7 @@
  *   Job 2579-180825, Revise 2 dated 10.02.26  ("WH-2Job 2579-180825-Revise 2-OP 2.pdf")
  *   Job 2304-24122024, Revise 10 dated 29.09.25  ("Job 2304 241225-Revise 10-Up3.pdf")
  *
- * STRUCTURE, AS CONFIRMED BY ISPAHANI
+ * STRUCTURE, AS CONFIRMED BY THE CLIENT
  * -----------------------------------
  * There is ONE warehouse: the building drawn as 203' x 79'-8" on Job 2579, the
  * later of the two jobs. It is divided into TWO sections:
@@ -141,7 +141,7 @@ export const RACK_PROFILES: RackProfile[] = [
 export const WAREHOUSE: WarehouseSpec = {
   id: "wh_main",
   code: "WH",
-  name: "Ispahani Tea Warehouse",
+  name: "Main Warehouse",
   siteId: "site_main",
   drawingRef: DRAWING_JOB_2579,
   sheet: 'Sheets 1-2 of 3 - WARE HOUSE 203\' x 79\'-8"',
@@ -159,7 +159,7 @@ export const WAREHOUSE: WarehouseSpec = {
       materialGroupConfirmed: true,
       stage: "raw",
       sourceNote:
-        "Incoming tea and packing material, held until it is issued to production. Packing material shares this section because it is also an input to production; confirm whether Ispahani wants it separated.",
+        "Incoming tea and packing material, held until it is issued to production. Packing material shares this section because it is also an input to production; confirm whether the client wants it separated.",
       aisles: 5,
       groups: [
         {
