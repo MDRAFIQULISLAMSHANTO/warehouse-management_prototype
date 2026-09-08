@@ -19,9 +19,9 @@ interface Step {
 
 const MANAGEMENT: Step[] = [
   {
-    title: "Open with the whole estate",
+    title: "Open with the building",
     detail:
-      "Warehouse Occupancy shows all four modelled areas at once: 4,593 installed positions taken straight from the MinMax capacity tables, how many hold a pallet, and how many are genuinely available for put-away rather than merely empty.",
+      "Warehouse Occupancy shows the whole warehouse: 1,895 installed pallet positions taken straight from the MinMax capacity table, how many hold a pallet, and how many are genuinely available for put-away rather than merely empty. The comparison chart splits it into the two sections - Raw Material and Packed Tea / FG.",
     to: "/dashboards/warehouse-occupancy",
     linkLabel: "Warehouse Occupancy",
   },
@@ -35,16 +35,23 @@ const MANAGEMENT: Step[] = [
   {
     title: "Show where capacity is being lost",
     detail:
-      "Partially Filled Pallets quantifies part loads and lists conservative consolidation candidates. Each fill percentage states its basis - the product's own pallet capacity, not the rack's 800 kg rating.",
+      "Partially Filled Pallets quantifies part loads and lists conservative consolidation candidates. Every fill percentage states its basis - the product's own pallet capacity, not the 800 kg structural rating of the position.",
     to: "/dashboards/partial-pallets",
     linkLabel: "Partially Filled Pallets",
   },
   {
     title: "Show the building in three dimensions",
     detail:
-      "Switch the occupancy panel to 3D. Every installed position is drawn and coloured by what is in it - full, almost full, room available, reserved, empty, blocked. Orbit it, hover a position to read it, and click one to drop straight into that rack's elevation.",
+      "Switch the occupancy panel to 3D. Every installed position is drawn and coloured by what is in it. Use the legend to filter - show only the positions with room, or only the blocked ones - then click a position to glide the camera in and read its capacity, remaining space and contents.",
     to: "/dashboards/warehouse-occupancy?view=3d",
     linkLabel: "3D warehouse",
+  },
+  {
+    title: "Follow the material through the building",
+    detail:
+      "Operations is grouped the way the warehouse runs: Inbound receives and puts away into the Raw section, Production issues raw material out and receives finished goods back into the FG section, and Outbound picks and dispatches. Raw to production to finished goods, end to end.",
+    to: "/operations?preset=prod_issue",
+    linkLabel: "Issues to Production",
   },
   {
     title: "Move to stock value and availability",
@@ -56,14 +63,14 @@ const MANAGEMENT: Step[] = [
   {
     title: "Prove the numbers connect",
     detail:
-      "Click any figure. A card that counts distinct pallets opens exactly that many pallet records, with the filter carried across as a visible facet that can be removed.",
+      "Click any figure or any chart segment. A card that counts distinct pallets opens exactly that many pallet records, with the condition carried across as a visible facet that can be removed.",
     to: "/dashboards/stock-visibility",
     linkLabel: "Stock Visibility",
   },
   {
     title: "Close on traceability and honesty",
     detail:
-      "Inventory by Lot walks one lot from receipt to its current pallets and positions. Then show the assumptions page: what came from the drawings, what is provisional, and what still needs Ispahani's confirmation.",
+      "Inventory by Lot walks one lot from receipt to its current pallets and positions. Then show the assumptions page: what came from the drawing, what is provisional, and what still needs Ispahani's confirmation - starting with how the 219 bays split between the two sections.",
     to: "/about/assumptions",
     linkLabel: "Source Drawing Assumptions",
   },
@@ -73,21 +80,28 @@ const OPERATIONS: Step[] = [
   {
     title: "Start at the outstanding work",
     detail:
-      "Operations filtered to what is not yet processed: draft receipts, put-aways waiting to be done, picks that are Ready because stock is reserved for them.",
+      "Operations filtered to what is not yet processed: draft receipts, put-aways waiting to be done, and picks that are Ready because stock is reserved for them.",
     to: "/operations?preset=todo",
     linkLabel: "Operations to process",
   },
   {
     title: "Complete a put-away",
     detail:
-      "Open a Ready put-away. Its destination position was suggested because it is empty, unblocked, compatible and not already claimed. Validate it and watch the position change state on the map.",
+      "Open a Ready put-away. Its destination position was suggested because it is empty, unblocked, compatible with the goods and not already claimed by another operation. Validate it and watch the position change state on the map.",
     to: "/operations?preset=putaway",
     linkLabel: "Put-away operations",
   },
   {
+    title: "Bring a waiting pick to Ready",
+    detail:
+      "Open a Waiting pick: it has demand but nothing reserved, so there is no lot or pallet on the line yet. Check Availability finds stock by the product's removal strategy, reserves it, and fills in the lot and pallet. Only then does Validate appear.",
+    to: "/operations?preset=waiting",
+    linkLabel: "Waiting operations",
+  },
+  {
     title: "Pick part of a pallet",
     detail:
-      "Open a pallet, use Pick from this pallet, then Validate with a reduced quantity. The system offers a back order or lets you cancel the remaining demand - and cancelling does not make undelivered stock disappear.",
+      "Open a full pallet, use Pick from this pallet, then Validate with a reduced quantity. The system offers a back order or lets you cancel the remaining demand - and cancelling does not make undelivered stock disappear.",
     to: "/pallets?preset=partial",
     linkLabel: "Partially filled pallets",
   },
@@ -101,7 +115,7 @@ const OPERATIONS: Step[] = [
   {
     title: "Find anything by any handle",
     detail:
-      "Search a lot reference, a pallet licence plate, a rack code or a product name. Add Filters and Group By, save the result as a favourite, then reopen it later.",
+      "Search a lot reference, a pallet licence plate, a rack code or a product name. Add Filters and Group By - including by section - save the result as a favourite, then reopen it later.",
     to: "/stock",
     linkLabel: "Stock lines",
   },
@@ -138,9 +152,9 @@ const JOURNEYS: Journey[] = [
   },
   {
     id: "J2",
-    title: "Warehouse Occupancy → warehouse → rack elevation → cell → pallet",
+    title: "Warehouse Occupancy → section → rack elevation → cell → pallet",
     steps: [
-      "Open Warehouse Occupancy and choose a warehouse.",
+      "Open Warehouse Occupancy. The comparison chart shows the Raw and FG sections.",
       "Select a rack on the floor plan to load its elevation.",
       "Select an occupied position to open the preview.",
       "Use Open Pallet from the preview.",
@@ -151,15 +165,15 @@ const JOURNEYS: Journey[] = [
   },
   {
     id: "J2b",
-    title: "3D warehouse → position → rack elevation, and live recolouring",
+    title: "3D warehouse → filter → position → info card, and live recolouring",
     steps: [
       "Switch the occupancy panel to 3D and note the legend counts.",
-      "Hover a position to read its address and contents; click it to open that rack's elevation below.",
-      "Open a full pallet elsewhere, pick part of it and validate.",
-      "Return to the 3D view.",
+      "Select a legend row to filter - Free Space Available on its own, say. Filtered-out positions stay as faint shells.",
+      "Show all again, then click a red position: the camera glides in and a card gives the location, total capacity, available space and contents.",
+      "Pick part of that pallet elsewhere in the app, validate, and return to the 3D view.",
     ],
     outcome:
-      "The picked position changes colour from full to free-space-available and the legend counts move by one, because the 3D view reads the same live state as the dashboards.",
+      "The picked position changes from red to green and the legend counts move by one, because the 3D view reads the same live state as the dashboards. The six legend counts always sum to the 1,895 installed positions.",
     to: "/dashboards/warehouse-occupancy?view=3d",
   },
   {
@@ -172,36 +186,60 @@ const JOURNEYS: Journey[] = [
       "Validate the transfer, then return to the occupancy dashboard.",
     ],
     outcome:
-      "Total stock and the overall occupied-position count are unchanged. The source and destination rack summaries both change.",
+      "Total stock and the overall occupied-position count are unchanged - a relocation moves a pallet, it does not create or destroy one. The source and destination rack summaries both change.",
     to: "/dashboards/empty-cells",
   },
   {
     id: "J4",
-    title: "Partially Filled Pallet → partial pick → updated quantity and fill",
+    title: "Full pallet → partial pick → updated quantity and fill",
     steps: [
-      "Open Partially Filled Pallets and open a pallet holding around 800 kg.",
-      "Use Pick from this pallet for 200 kg.",
+      "Open a full 800 kg pallet - PAL-000024 in RAW/A2/R004/B09-L0-P1 is one of 97 that qualify.",
+      "Use Pick from this pallet for 200 kg, which creates a Ready pick and reserves the quantity.",
       "Validate the pick.",
     ],
     outcome:
-      "The pallet holds 600 kg, its fill percentage drops against the same capacity basis, and the cell stays occupied.",
-    to: "/dashboards/partial-pallets",
+      "The pallet holds 600 kg, its fill drops to 75% against the same 800 kg capacity basis, the position stays occupied, and the stock age is unchanged - picking from a pallet does not reset its receipt date.",
+    to: "/pallets/pal_000024",
+  },
+  {
+    id: "J4b",
+    title: "Waiting pick → Check Availability → Ready → Validate",
+    steps: [
+      "Open a Waiting pick. Demand is set but Reserved is zero and the line carries no lot or pallet.",
+      "Press Check Availability.",
+      "Press Validate.",
+    ],
+    outcome:
+      "Check Availability reserves the demand and fills in the lot and pallet, the state moves to Ready, and only then is Validate offered. A Ready operation always has its demand reserved - the integrity page asserts it.",
+    to: "/operations?preset=waiting",
   },
   {
     id: "J5",
-    title: "Inventory by Location / Product / Lot → filter and group → supporting records",
+    title: "Raw → production → finished goods",
     steps: [
-      "Open Inventory by Location and drill from site to warehouse to aisle to rack.",
-      "Open the stock lines for that scope.",
-      "Group by product, then by lot, and check the subtotals.",
-      "Export the filtered scope to CSV.",
+      "Open Operations → Production → Issues to Production. Each one moves raw or packing material out of a Raw section position to Virtual/Production.",
+      "Open Receipts from Production. Each one brings finished goods back from Virtual/Production into an FG section position.",
+      "Open one of each and compare the source document reference.",
     ],
     outcome:
-      "Group counts and subtotals reconcile with the figures on the dashboard, and the CSV contains exactly the filtered scope.",
-    to: "/dashboards/inventory-by-location",
+      "The two halves of production share a batch reference, and stock is only ever consumed from the Raw section and produced into the FG section. Manufacturing itself is out of scope: there is no order and no bill of materials, only the two ends the warehouse sees.",
+    to: "/operations?preset=prod_issue",
   },
   {
     id: "J6",
+    title: "Inventory by Location / Product / Lot → filter and group → supporting records",
+    steps: [
+      "Open Inventory by Location and drill from the warehouse down through aisle to rack.",
+      "Open the stock lines for that scope.",
+      "Group by section, then by product, and check the subtotals.",
+      "Export the filtered scope to CSV.",
+    ],
+    outcome:
+      "Group counts and subtotals reconcile with the figures on the dashboard, and the CSV contains exactly the filtered scope - no more rows and no fewer.",
+    to: "/dashboards/inventory-by-location",
+  },
+  {
+    id: "J7",
     title: "Save a favourite → navigate away → restore → open a record → return with context",
     steps: [
       "Filter a list, add a Group By, then Favorites → Save current search.",

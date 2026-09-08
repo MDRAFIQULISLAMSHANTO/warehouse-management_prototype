@@ -1140,6 +1140,12 @@ function buildOperations(args: OpBuildArgs): {
     for (let i = 0; i < runs; i++) {
       const daysAgo = rng.int(1, HISTORY_DAYS);
       const at = addHours(addDays(now, -daysAgo), rng.int(6, 16));
+      // Both halves of a run are decided together. Creating the issue and then
+      // skipping the receipt because it would land after the demo clock left
+      // raw material that had gone to production and never come back - stock
+      // that simply vanished from the building.
+      const producedAt = addHours(at, rng.int(4, 30));
+      if (producedAt > now) continue;
       const operator = rng.pick(operators);
       const batchRef = `PRD/${at.getUTCFullYear()}/${pad(rng.int(1, 9999), 4)}`;
 
@@ -1185,8 +1191,6 @@ function buildOperations(args: OpBuildArgs): {
       }
 
       // --- receive finished goods back into the FG section
-      const producedAt = addHours(at, rng.int(4, 30));
-      if (producedAt > now) continue;
       const produced = rng.shuffle(fgPool).slice(0, rng.int(1, 2));
       const receipt = addOperation({
         typeId: receiptType.id,

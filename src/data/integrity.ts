@@ -215,5 +215,29 @@ export function runIntegrityChecks(
       : `${data.operations.filter((op) => op.state === "ready").length} Ready operation(s) fully reserved`,
   });
 
+  // 12. Production is a round trip. An issue with no matching receipt means
+  //     raw material left the Raw section and never arrived anywhere - stock
+  //     that vanished from the building.
+  const issues = data.operations.filter((op) => op.kind === "production_issue");
+  const receiptDocs = new Set(
+    data.operations
+      .filter((op) => op.kind === "production_receipt")
+      .map((op) => op.sourceDocument ?? ""),
+  );
+  const orphanIssues = issues.filter(
+    (op) => !op.sourceDocument || !receiptDocs.has(op.sourceDocument),
+  );
+  results.push({
+    id: "production_runs_paired",
+    label: "Every issue to production has a matching receipt",
+    ok: orphanIssues.length === 0,
+    detail: orphanIssues.length
+      ? `${orphanIssues.length} issue(s) with no receipt, e.g. ${orphanIssues
+          .slice(0, 3)
+          .map((op) => op.name)
+          .join(", ")}`
+      : `${issues.length} production run(s) paired issue to receipt`,
+  });
+
   return results;
 }

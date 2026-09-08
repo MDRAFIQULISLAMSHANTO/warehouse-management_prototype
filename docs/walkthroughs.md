@@ -4,16 +4,21 @@ Scripted routes for a client session, plus the end-to-end journeys used to verif
 the prototype. Also available in the application at `/about/walkthroughs`, and as
 a step-through **Guided demo** panel in the bottom-left corner of every screen.
 
+The warehouse is **one building** with **two sections** — Raw Material and Packed
+Tea / FG — holding **1,895 installed pallet positions**. Stock flows
+**Raw → production → Finished Goods**.
+
 ---
 
 ## Management walkthrough (~10 minutes)
 
 Capacity and control first, detail second.
 
-1. **Open with the whole estate** — `/dashboards/warehouse-occupancy`
-   All four modelled areas at once: 4,593 installed positions taken straight from
-   the MinMax capacity tables, how many hold a pallet, and how many are *genuinely
-   available* for put-away rather than merely empty.
+1. **Open with the building** — `/dashboards/warehouse-occupancy`
+   1,895 installed positions taken straight from the MinMax capacity table, how
+   many hold a pallet, and how many are *genuinely available* for put-away
+   rather than merely empty. The comparison chart splits it into the two
+   sections.
 
 2. **Make the distinction that matters** — `/dashboards/empty-cells`
    Physically empty, available for put-away, reserved for incoming stock, and
@@ -22,29 +27,34 @@ Capacity and control first, detail second.
 
 3. **Show where capacity is being lost** — `/dashboards/partial-pallets`
    Part loads quantified, with conservative consolidation candidates. Every fill
-   percentage states its basis: the product's own pallet capacity, not the rack's
-   800 kg rating.
+   percentage states its basis: the product's own pallet capacity, not the
+   800 kg structural rating of the position.
 
 4. **Show the building in three dimensions** — `/dashboards/warehouse-occupancy?view=3d`
-   Every installed position drawn and coloured by what is in it. Orbit it, hover
-   a position to read it, and click one to glide the camera in and open its
+   Every installed position drawn and coloured by what is in it. Use the legend
+   to filter, then click a position to glide the camera in and read its
    capacity, remaining space and contents.
 
-5. **Move to stock value and availability** — `/dashboards/stock-visibility`
+5. **Follow the material through the building** — `/operations?preset=prod_issue`
+   Operations is grouped the way the warehouse runs: Inbound receives and puts
+   away into the Raw section, Production issues raw material out and receives
+   finished goods back into the FG section, Outbound picks and dispatches.
+
+6. **Move to stock value and availability** — `/dashboards/stock-visibility`
    On hand, reserved and available to pick, each quantity inside its own unit of
    measure. Reservations reduce what can be picked without touching on-hand
    quantity.
 
-6. **Prove the numbers connect**
-   Click any figure. A card that counts distinct pallets opens exactly that many
-   pallet records, with the filter carried across as a visible facet that can be
-   removed.
+7. **Prove the numbers connect**
+   Click any figure or chart segment. A card that counts distinct pallets opens
+   exactly that many pallet records, with the condition carried across as a
+   visible facet that can be removed.
 
-7. **Close on traceability and honesty** — `/dashboards/inventory-by-lot`, then
+8. **Close on traceability and honesty** — `/dashboards/inventory-by-lot`, then
    `/about/assumptions`
-   Walk one lot from receipt to its current pallets and positions. Then show what
-   came from the drawings, what is provisional, and what still needs Ispahani's
-   confirmation.
+   Walk one lot from receipt to its current pallets and positions. Then show
+   what came from the drawing and what is provisional — starting with how the
+   219 bays split between the two sections.
 
 ---
 
@@ -53,31 +63,15 @@ Capacity and control first, detail second.
 Daily work, in the order an operator meets it.
 
 1. **Start at the outstanding work** — `/operations?preset=todo`
-   Draft receipts, put-aways waiting to be done, picks that are Ready because
-   stock is reserved for them.
-
 2. **Complete a put-away** — `/operations?preset=putaway`
-   Open a Ready put-away. Its destination was suggested because it is empty,
-   unblocked, compatible and not already claimed. Validate it and watch the
-   position change state on the map.
-
-3. **Pick part of a pallet** — `/pallets?preset=partial`
-   Open a pallet, use *Pick from this pallet*, then Validate with a reduced
-   quantity. The system offers a back order or lets you cancel the remaining
-   demand — and cancelling does not make undelivered stock disappear.
-
-4. **Relocate a pallet** — `/pallets`
-   *Relocate pallet* lists compatible destinations and states why each one
-   qualifies. Creating the transfer claims that position so a second operation
-   cannot be routed to it.
-
-5. **Find anything by any handle** — `/stock`
-   Search a lot reference, a pallet licence plate, a rack code or a product name.
-   Add Filters and Group By, save the result as a favourite, then reopen it later.
-
-6. **Show the audit trail** — `/reporting/inventory-movement-history`
-   Every validated movement, with source and destination position and the pallet
-   involved. Validated operations cannot be cancelled — they keep their history.
+3. **Bring a waiting pick to Ready** — `/operations?preset=waiting`
+   Demand is set but nothing is reserved and the line has no lot or pallet.
+   Check Availability reserves stock and fills them in; only then does Validate
+   appear.
+4. **Pick part of a pallet** — `/pallets?preset=partial`
+5. **Relocate a pallet** — `/pallets`
+6. **Find anything by any handle** — `/stock`
+7. **Show the audit trail** — `/reporting/inventory-movement-history`
 
 ---
 
@@ -85,87 +79,89 @@ Daily work, in the order an operator meets it.
 
 ### J1 — Stock Visibility → product → lot → pallet → locate on the map
 
-1. Open Stock Visibility and select a product bar in *Product quantity analysis*.
-2. Open the product record and pick a lot from its Lots tab.
-3. From the lot, open one of its pallets.
-4. From the pallet, open its position, then view it inside the rack elevation.
-
 **Expected outcome:** the same lot and pallet identifiers appear at every step,
 and the final screen shows the physical position in the rack.
 
-### J2 — Warehouse Occupancy → warehouse → rack elevation → cell → pallet
-
-1. Open Warehouse Occupancy and choose a warehouse.
-2. Select a rack on the floor plan to load its elevation.
-3. Select an occupied position to open the preview.
-4. Use *Open Pallet* from the preview.
+### J2 — Warehouse Occupancy → section → rack elevation → cell → pallet
 
 **Expected outcome:** occupancy percentages on the rack match the tiles drawn in
 its elevation, and the pallet record matches the preview.
 
-### J2b — 3D warehouse → position → info card, and live recolouring
+### J2b — 3D warehouse → filter → position → info card, and live recolouring
 
-1. Switch the occupancy panel to **3D** and note the legend counts.
-2. Hover a position to read its address and contents.
-3. Click it: the camera glides in, every other volume washes out, and a card
-   gives the location reference, total capacity, available space and contents.
-4. Open a full pallet elsewhere, pick part of it and validate, then return.
+1. Switch to 3D and note the legend counts.
+2. Filter by a legend row; filtered-out positions stay as faint shells.
+3. Show all, then click a red position for its capacity card.
+4. Pick part of that pallet, validate, and return.
 
-**Expected outcome:** the picked position changes from red to green and the
-legend counts move by one, because the 3D view reads the same live state as the
-dashboards.
-
-*Verified:* Full/Overload 709 → 708 and Free Space Available 200 → 201 after a
-200 kg pick, with the total still 1,325.
+**Expected outcome:** the position changes from red to green and the legend
+counts move by one. The six legend counts always sum to 1,895.
 
 ### J3 — Empty Cell → compatible destination → internal transfer → updated occupancy
 
-1. Open Empty Cells and select a product in the suggestion panel.
-2. Note why each suggested position qualifies.
-3. Open a pallet and use *Relocate pallet*, choosing a suggested destination.
-4. Validate the transfer, then return to the occupancy dashboard.
-
 **Expected outcome:** total stock and the overall occupied-position count are
-unchanged. The source and destination rack summaries both change.
+unchanged — a relocation moves a pallet, it does not create or destroy one. The
+source and destination rack summaries both change.
 
-*Verified:* occupied stayed at 2,823 of 4,593 (61.5%), available for put-away
-stayed at 1,636, and the pallet moved from `RTW2/A2/R004/B08-L0-P2` to
-`RTW2/A2/R004/B05-L1-P1`.
+### J4 — Full pallet → partial pick → updated quantity and fill
 
-### J4 — Partially Filled Pallet → partial pick → updated quantity and fill
+1. Open a full 800 kg pallet — `PAL-000024` in `RAW/A2/R004/B09-L0-P1` is one of
+   97 that qualify.
+2. Pick 200 kg, then validate.
 
-1. Open a pallet holding 800 kg.
-2. Use *Pick from this pallet* for 200 kg.
-3. Validate the pick.
+**Expected outcome:** 600 kg remaining, fill 75% against the same 800 kg basis,
+position still occupied, stock age unchanged.
 
-**Expected outcome:** the pallet holds 600 kg, its fill percentage drops against
-the same capacity basis, and the cell stays occupied.
+### J4b — Waiting pick → Check Availability → Ready → Validate
 
-*Verified:* 800 kg → 600 kg, status Full → Partially filled, fill 100% → 75%
-against the same 800 kg basis, remaining capacity 200 kg, position unchanged,
-and stock age unchanged at 59 days.
+**Expected outcome:** Check Availability reserves the demand and fills in the lot
+and pallet, the state moves to Ready, and only then is Validate offered. A Ready
+operation always has its demand reserved — the integrity page asserts it.
 
-### J5 — Inventory by Location / Product / Lot → filter and group → supporting records
+### J5 — Raw → production → finished goods
 
-1. Open Inventory by Location and drill from site to warehouse to aisle to rack.
-2. Open the stock lines for that scope.
-3. Group by product, then by lot, and check the subtotals.
-4. Export the filtered scope to CSV.
+1. Open Issues to Production: each moves raw or packing material out of a Raw
+   position to `Virtual/Production`.
+2. Open Receipts from Production: each brings finished goods back into an FG
+   position.
+3. Search one batch reference to see both halves.
+
+**Expected outcome:** the two halves share a source document, and stock is only
+ever consumed from Raw and produced into FG.
+
+*Verified:* `PRD/2026/4557` returns exactly two operations — the issue from
+`RAW/A2/R004/B03-L0-P2` on 04 Sept and the receipt into `FG/A1/R016/B05-L0-P2`
+on 05 Sept. All 41 production runs are paired, which the integrity page checks.
+
+### J6 — Inventory by Location / Product / Lot → filter and group → supporting records
 
 **Expected outcome:** group counts and subtotals reconcile with the dashboard,
 and the CSV contains exactly the filtered scope.
 
-*Verified:* a 180-record filtered scope produced 14 groups summing to exactly
-180, unchanged footer totals, and a CSV with exactly 180 data rows.
+### J7 — Save a favourite → navigate away → restore → open a record → return
 
-### J6 — Save a favourite → navigate away → restore → open a record → return with context
+**Expected outcome:** filters, grouping, sort order and page are all restored,
+and returning from the record keeps them.
 
-1. Filter a list, add a Group By, then Favorites → *Save current search*.
-2. Navigate to another screen, then reopen the favourite.
-3. Open a record from the restored list and use the browser Back button.
+---
 
-**Expected outcome:** filters, grouping, sort order and page are all restored, and
-returning from the record keeps them.
+## Baseline figures
+
+Seeded state, before any operation is validated in the session:
+
+| Figure | Value |
+|---|---:|
+| Installed positions | 1,895 |
+| Occupied | 1,266 |
+| Physically empty | 599 |
+| Blocked | 30 |
+| Available for put-away | 582 |
+| Reserved for incoming | 17 |
+| Physical occupancy | 66.8% |
+| Partial pallets | 300 |
+| Production runs (issue + receipt) | 41 |
+
+Use **Reset Demo** to return to these.
 
 ---
 
@@ -173,10 +169,10 @@ returning from the record keeps them.
 
 - All stock, lots, pallets, operators and partners are illustrative demonstration
   data, **not Ispahani records**.
-- Warehouse capacities come from the MinMax drawings and reconcile with them
-  exactly. Floor-plan geometry is schematic.
+- Capacity comes from the MinMax drawing and reconciles with it exactly. The
+  split of the 219 bays between the two sections is **assumed** and needs
+  confirming. Floor-plan geometry is schematic.
 - The maps, occupancy colouring and consolidation suggestions are **proposed
   extensions**, not stock Odoo configuration.
-- Do not quote accuracy percentages, savings or ROI from this prototype. It has
-  no basis for any of them.
-- Use **Reset Demo** between sessions to restore the seeded state.
+- Do not quote accuracy percentages, savings or ROI from this prototype.
+- Use **Reset Demo** between sessions.
